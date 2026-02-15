@@ -131,7 +131,7 @@ export const clearRedisAuthState = async (redis: Redis, keyPrefix: string) => {
             if (keys && keys.length > 0) {
                 await redis.del(...keys);
             }
-        } while (cursor !== 0 && cursor !== '0');
+        } while (String(cursor) !== '0');
 
     } catch (error) {
         console.error('Redis clear error:', error);
