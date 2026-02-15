@@ -28,7 +28,11 @@ export async function GET(req: NextRequest) {
             );
         }
 
+        console.log(`[API-Groups] Fetching groups for profile ${profileId}...`);
+        const start = Date.now();
         const groups = await sock.groupFetchAllParticipating();
+        console.log(`[API-Groups] Fetched ${Object.keys(groups).length} groups in ${Date.now() - start}ms`);
+
         const groupList = Object.values(groups).map((g) => ({
             id: g.id,
             subject: g.subject,
