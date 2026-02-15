@@ -80,7 +80,7 @@ export const useRedisAuthState = async (
                                 } else if (typeof val === 'string') {
                                     value = JSON.parse(val, BufferJSON.reviver);
                                 }
-                                data[id] = value;
+                                data[id] = value as SignalDataTypeMap[typeof type];
                             }
                         });
                     }
