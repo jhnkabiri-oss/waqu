@@ -117,20 +117,21 @@ export const useRedisAuthState = async (
 
 export const clearRedisAuthState = async (redis: Redis, keyPrefix: string) => {
     try {
-        // Upstash HTTP doesn't support scanStream.
-        // Use scan with a loop.
-        let cursor = 0;
+        let cursor: number | string = 0;
         do {
-            const [nextCursor, keys] = await redis.scan(cursor, {
+            const [nextCursor, keys] = await redis.scan(cursor as number, {
                 match: `${keyPrefix}*`,
                 count: 100
             });
-            cursor = typeof nextCursor === 'string' ? parseInt(nextCursor) : nextCursor;
+
+            // Upstash returns cursor as string or number depending on client version/response
+            // We cast nextCursor to handle the loop condition
+            cursor = nextCursor;
 
             if (keys && keys.length > 0) {
                 await redis.del(...keys);
             }
-        } while (cursor !== 0);
+        } while (cursor !== 0 && cursor !== '0');
 
     } catch (error) {
         console.error('Redis clear error:', error);
