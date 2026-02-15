@@ -93,8 +93,56 @@ export async function PUT(req: NextRequest) {
                 await sock.groupParticipantsUpdate(groupId, data.participants, 'demote');
                 break;
             case 'bulkAddMembers':
-                // Custom action if implemented or just re-use addParticipants
-                await sock.groupParticipantsUpdate(groupId, data.participants, 'add');
+                // Implement safe bulk add with delays
+                if (Array.isArray(data.participants) && data.participants.length > 0) {
+                    const participants = data.participants;
+                    let addedCount = 0;
+                    let failedCount = 0;
+
+                    console.log(`[Groups] Bulk adding ${participants.length} members to group ${groupId}`);
+
+                    for (let i = 0; i < participants.length; i++) {
+                        const member = participants[i];
+                        try {
+                            // Add member
+                            await sock.groupParticipantsUpdate(groupId, [member], 'add');
+                            addedCount++;
+                            console.log(`[Groups]   ✅ Added ${i + 1}/${participants.length}: ${member}`);
+                        } catch (err) {
+                            const errMsg = (err as Error).message || '';
+                            if (errMsg.includes('rate') || errMsg.includes('429')) {
+                                console.log(`[Groups]   ⚠️ Rate limited on ${member}, waiting 30s...`);
+                                await new Promise(resolve => setTimeout(resolve, 30000));
+
+                                // Retry once
+                                try {
+                                    await sock.groupParticipantsUpdate(groupId, [member], 'add');
+                                    addedCount++;
+                                    console.log(`[Groups]   ✅ Retry success: ${member}`);
+                                } catch (retryErr) {
+                                    failedCount++;
+                                    console.log(`[Groups]   ❌ Retry failed: ${member}`);
+                                }
+                            } else {
+                                failedCount++;
+                                console.log(`[Groups]   ❌ Failed: ${member}: ${errMsg}`);
+                            }
+                        }
+
+                        // Delay between adds (3-5 seconds to be safe)
+                        if (i < participants.length - 1) {
+                            const delay = Math.floor(Math.random() * (5000 - 3000 + 1) + 3000);
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                        }
+                    }
+                    return NextResponse.json({
+                        message: `Bulk add completed: ${addedCount} added, ${failedCount} failed`,
+                        added: addedCount,
+                        failed: failedCount
+                    });
+                } else {
+                    return NextResponse.json({ error: 'Invalid participants list' }, { status: 400 });
+                }
                 break;
             default:
                 return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
