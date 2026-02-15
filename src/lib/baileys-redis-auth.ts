@@ -5,7 +5,7 @@ import {
     initAuthCreds,
     BufferJSON
 } from '@whiskeysockets/baileys';
-import Redis from 'ioredis';
+import { Redis } from '@upstash/redis';
 
 export const useRedisAuthState = async (
     redis: Redis,
@@ -24,7 +24,21 @@ export const useRedisAuthState = async (
     const readData = async (key: string) => {
         try {
             const data = await redis.get(key);
-            if (data) {
+            if (data === null || data === undefined) {
+                return null;
+            }
+            // Upstash returns the object directly if it detects JSON, or string.
+            // Better to force string or handle object.
+            // Actually Upstash auto-parses JSON. But Baileys BufferJSON needs custom reviver.
+            // So we should store as string (which JSON.stringify does) and parse manually.
+            if (typeof data === 'object') {
+                // If Upstash auto-parsed it, we might need to re-stringify to use BufferJSON.reviver
+                // Or we just hope no Buffers are needed (but they are for keys).
+                // Safer to let Upstash return string? No, Upstash SDK auto-parses.
+                // We can use JSON.stringify(data) then JSON.parse(..., reviver) to restore Buffers.
+                return JSON.parse(JSON.stringify(data), BufferJSON.reviver);
+            }
+            if (typeof data === 'string') {
                 return JSON.parse(data, BufferJSON.reviver);
             }
         } catch (error) {
@@ -52,10 +66,20 @@ export const useRedisAuthState = async (
 
                     if (results) {
                         results.forEach((result, index) => {
-                            const [err, val] = result;
-                            if (!err && val && typeof val === 'string') {
+                            // Upstash pipeline result: [result1, result2, ...]
+                            // result can be the value or error?
+                            // Upstash SDK throws on error usually?
+                            // exec() returns an array of responses.
+                            const val = result; // In Upstash, result is the value directly
+                            if (val) {
                                 const id = ids[index];
-                                const value = JSON.parse(val, BufferJSON.reviver);
+                                let value = val;
+                                // Handle auto-parsing
+                                if (typeof val === 'object') {
+                                    value = JSON.parse(JSON.stringify(val), BufferJSON.reviver);
+                                } else if (typeof val === 'string') {
+                                    value = JSON.parse(val, BufferJSON.reviver);
+                                }
                                 data[id] = value;
                             }
                         });
@@ -93,21 +117,21 @@ export const useRedisAuthState = async (
 
 export const clearRedisAuthState = async (redis: Redis, keyPrefix: string) => {
     try {
-        const stream = redis.scanStream({
-            match: `${keyPrefix}*`,
-            count: 100
-        });
+        // Upstash HTTP doesn't support scanStream.
+        // Use scan with a loop.
+        let cursor = 0;
+        do {
+            const [nextCursor, keys] = await redis.scan(cursor, {
+                match: `${keyPrefix}*`,
+                count: 100
+            });
+            cursor = typeof nextCursor === 'string' ? parseInt(nextCursor) : nextCursor;
 
-        stream.on('data', async (keys) => {
-            if (keys.length) {
+            if (keys && keys.length > 0) {
                 await redis.del(...keys);
             }
-        });
+        } while (cursor !== 0);
 
-        return new Promise<void>((resolve, reject) => {
-            stream.on('end', () => resolve());
-            stream.on('error', (err) => reject(err));
-        });
     } catch (error) {
         console.error('Redis clear error:', error);
     }

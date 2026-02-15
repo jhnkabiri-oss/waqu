@@ -19,17 +19,17 @@ export default function LoginPage() {
         setLoading(true);
         setError('');
 
-        if (!captchaToken) {
-            setError('Please complete the CAPTCHA');
-            setLoading(false);
-            return;
-        }
+        // if (!captchaToken) {
+        //     setError('Please complete the CAPTCHA');
+        //     setLoading(false);
+        //     return;
+        // }
 
         try {
             const { error: signInError } = await supabase.auth.signInWithPassword({
                 email,
                 password,
-                options: { captchaToken },
+                // options: { captchaToken },
             });
 
             if (signInError) {
@@ -103,11 +103,16 @@ export default function LoginPage() {
                     )}
 
                     <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
-                        <Turnstile
-                            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''}
-                            onSuccess={(token) => setCaptchaToken(token)}
-                            options={{ theme: 'light' }}
-                        />
+                        {/* <div className="flex justify-center">
+            <Turnstile
+              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''}
+              onSuccess={(token) => setCaptchaToken(token)}
+              options={{
+                theme: 'light',
+                size: 'normal',
+              }}
+            />
+          </div> */}
                     </div>
 
                     <button
