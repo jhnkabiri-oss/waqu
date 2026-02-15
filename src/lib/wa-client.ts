@@ -229,6 +229,9 @@ export class WAClient extends EventEmitter {
             if (connection === 'close') {
                 this.currentQR = null;
                 const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+                const error = lastDisconnect?.error;
+
+                console.error(`[WA-${this.userId}-${this.profileId}] ❌ Disconnected! Status: ${statusCode}`, error);
 
                 if (this.isPairingMode) return;
 

@@ -84,6 +84,8 @@ export const useRedisAuthState = async (
                             }
                         });
                     }
+                    // Debug Log
+                    // console.log(`[RedisAuth] GET ${type} (${ids.length} ids) -> Found ${Object.keys(data).length}`);
                     return data;
                 },
                 set: async (data) => {
