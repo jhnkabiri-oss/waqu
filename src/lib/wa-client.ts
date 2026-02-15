@@ -1,6 +1,5 @@
 import makeWASocket, {
     DisconnectReason,
-    useMultiFileAuthState,
     fetchLatestBaileysVersion,
     WASocket,
     ConnectionState,
@@ -8,13 +7,13 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
-import path from 'path';
-import fs from 'fs';
 import { EventEmitter } from 'events';
+import { useRedisAuthState, clearRedisAuthState } from './baileys-redis-auth';
+import { redis } from './redis';
 
-const BASE_AUTH_FOLDER = path.join(process.cwd(), 'wa-sessions');
 const logger = pino({ level: 'silent' });
 const MAX_PROFILES_PER_USER = 10;
+const SESSION_PREFIX = 'wa:sess:';
 
 export class WAClient extends EventEmitter {
     private socket: WASocket | null = null;
@@ -26,16 +25,16 @@ export class WAClient extends EventEmitter {
     private maxReconnectAttempts = 5;
     private isPairingMode = false;
     public readonly profileId: string;
-    public readonly userId: string; // Added userId
-    private authFolder: string;
+    public readonly userId: string;
+    private redisPrefix: string;
 
     constructor(userId: string, profileId: string) {
         super();
         this.setMaxListeners(30);
         this.userId = userId;
         this.profileId = profileId;
-        // Path: wa-sessions/USER_ID/profile-ID
-        this.authFolder = path.join(BASE_AUTH_FOLDER, userId, `profile-${profileId}`);
+        // Key: wa:sess:USER_ID:profile-ID:
+        this.redisPrefix = `${SESSION_PREFIX}${userId}:profile-${profileId}:`;
     }
 
     getStatus() {
@@ -48,8 +47,6 @@ export class WAClient extends EventEmitter {
             phoneNumber: this.phoneNumber,
         };
     }
-
-    // ... (rest of the class methods remain mostly same but use new authFolder)
 
     getSocket(): WASocket | null {
         return this.socket;
@@ -69,12 +66,7 @@ export class WAClient extends EventEmitter {
         this.emit('status', this.getStatus());
 
         try {
-            // Ensure directory exists
-            if (!fs.existsSync(this.authFolder)) {
-                fs.mkdirSync(this.authFolder, { recursive: true });
-            }
-
-            const { state, saveCreds } = await useMultiFileAuthState(this.authFolder);
+            const { state, saveCreds } = await useRedisAuthState(redis, this.redisPrefix);
             const { version } = await fetchLatestBaileysVersion();
 
             this.socket = makeWASocket({
@@ -84,10 +76,14 @@ export class WAClient extends EventEmitter {
                 browser: Browsers.ubuntu('Chrome'),
                 generateHighQualityLinkPreview: false,
                 syncFullHistory: false,
+                connectTimeoutMs: 60000,
             });
 
             this.socket.ev.on('creds.update', saveCreds);
             this.setupConnectionListener();
+
+            // Register as active session
+            await redis.sadd('wa:active_sessions', `${this.userId}:${this.profileId}`);
         } catch (error) {
             console.error(`[WA-${this.userId}-${this.profileId}] Connection error:`, error);
             this.connectionStatus = 'disconnected';
@@ -121,12 +117,9 @@ export class WAClient extends EventEmitter {
         this.emit('status', this.getStatus());
 
         try {
-            if (fs.existsSync(this.authFolder)) {
-                fs.rmSync(this.authFolder, { recursive: true, force: true });
-            }
-            fs.mkdirSync(this.authFolder, { recursive: true });
+            await clearRedisAuthState(redis, this.redisPrefix);
 
-            const { state, saveCreds } = await useMultiFileAuthState(this.authFolder);
+            const { state, saveCreds } = await useRedisAuthState(redis, this.redisPrefix);
             const { version } = await fetchLatestBaileysVersion();
 
             const sock = makeWASocket({
@@ -136,10 +129,14 @@ export class WAClient extends EventEmitter {
                 browser: Browsers.ubuntu('Chrome'),
                 generateHighQualityLinkPreview: false,
                 syncFullHistory: false,
+                connectTimeoutMs: 60000,
             });
 
             this.socket = sock;
             sock.ev.on('creds.update', saveCreds);
+
+            // Register as active session
+            await redis.sadd('wa:active_sessions', `${this.userId}:${this.profileId}`);
 
             const code = await new Promise<string>((resolve, reject) => {
                 const timeout = setTimeout(() => {
@@ -242,6 +239,8 @@ export class WAClient extends EventEmitter {
                     this.reconnectAttempts = 0;
                     this.emit('status', this.getStatus());
                     this.emit('logged-out');
+                    redis.srem('wa:active_sessions', `${this.userId}:${this.profileId}`);
+                    clearRedisAuthState(redis, this.redisPrefix);
                 } else if (this.reconnectAttempts < this.maxReconnectAttempts) {
                     this.reconnectAttempts++;
                     this.connectionStatus = 'connecting';
@@ -276,9 +275,9 @@ export class WAClient extends EventEmitter {
             } catch { /* ignore */ }
             this.socket = null;
         }
-        if (fs.existsSync(this.authFolder)) {
-            fs.rmSync(this.authFolder, { recursive: true, force: true });
-        }
+        await clearRedisAuthState(redis, this.redisPrefix);
+        await redis.srem('wa:active_sessions', `${this.userId}:${this.profileId}`);
+
         this.connectionStatus = 'disconnected';
         this.currentQR = null;
         this.pairingCode = null;
@@ -297,9 +296,7 @@ export class WAClient extends EventEmitter {
             }
             this.socket = null;
         }
-        if (fs.existsSync(this.authFolder)) {
-            fs.rmSync(this.authFolder, { recursive: true, force: true });
-        }
+
         this.connectionStatus = 'disconnected';
         this.currentQR = null;
         this.pairingCode = null;
@@ -374,35 +371,38 @@ class WAClientManager {
         }
     }
 
-    // Auto-connect profiles that have saved sessions
+    // Auto-connect profiles that have saved sessions in Redis
     async autoReconnect(): Promise<void> {
-        if (!fs.existsSync(BASE_AUTH_FOLDER)) return;
+        try {
+            // Get all active sessions from Redis Set
+            const activeSessions = await redis.smembers('wa:active_sessions');
 
-        // Structure: wa-sessions/USER_ID/profile-ID
-        const userDirs = fs.readdirSync(BASE_AUTH_FOLDER).filter(d =>
-            fs.statSync(path.join(BASE_AUTH_FOLDER, d)).isDirectory()
-        );
+            console.log(`[WAManager] Found ${activeSessions.length} active sessions to reconnect`);
 
-        for (const userId of userDirs) {
-            const userPath = path.join(BASE_AUTH_FOLDER, userId);
-            const profileDirs = fs.readdirSync(userPath).filter(d =>
-                d.startsWith('profile-') && fs.statSync(path.join(userPath, d)).isDirectory()
-            );
+            for (const sessionKey of activeSessions) {
+                // key is "userId:profileId"
+                const [userId, profileId] = sessionKey.split(':');
+                if (!userId || !profileId) continue;
 
-            for (const profileDir of profileDirs) {
-                const profileId = profileDir.replace('profile-', '');
-                const credsPath = path.join(userPath, profileDir, 'creds.json');
+                console.log(`[WAManager] Auto-reconnecting User ${userId} Profile ${profileId}...`);
+                try {
+                    const client = this.getOrCreateClient(userId, profileId);
+                    // Check if creds exist
+                    const credsKey = `${SESSION_PREFIX}${userId}:profile-${profileId}:creds`;
+                    const hasCreds = await redis.exists(credsKey);
 
-                if (fs.existsSync(credsPath)) {
-                    console.log(`[WAManager] Auto-reconnecting User ${userId} Profile ${profileId}...`);
-                    try {
-                        const client = this.getOrCreateClient(userId, profileId);
+                    if (hasCreds) {
                         await client.connect();
-                    } catch (err) {
-                        console.error(`[WAManager] Failed to reconnect User ${userId} Profile ${profileId}:`, err);
+                    } else {
+                        // Cleanup invalid session
+                        await redis.srem('wa:active_sessions', sessionKey);
                     }
+                } catch (err) {
+                    console.error(`[WAManager] Failed to reconnect User ${userId} Profile ${profileId}:`, err);
                 }
             }
+        } catch (error) {
+            console.error('[WAManager] Auto-reconnect failed:', error);
         }
     }
 }
@@ -414,6 +414,3 @@ if (process.env.NODE_ENV !== 'production') globalForWA.waManager = waManager;
 
 // Auto-reconnect saved sessions on startup
 waManager.autoReconnect().catch(console.error);
-
-// No default export to enforce usage of waManager with userId
-
