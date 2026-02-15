@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hapi/boom": "^10.0.1",
+    "@marsidev/react-turnstile": "^1.4.2",
     "@prisma/client": "^5.22.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.95.3",
