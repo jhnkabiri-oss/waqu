@@ -119,7 +119,7 @@ export const clearRedisAuthState = async (redis: Redis, keyPrefix: string) => {
     try {
         let cursor: number | string = 0;
         do {
-            const [nextCursor, keys] = await redis.scan(cursor as number, {
+            const [nextCursor, keys]: [string | number, string[]] = await redis.scan(cursor as number, {
                 match: `${keyPrefix}*`,
                 count: 100
             });
