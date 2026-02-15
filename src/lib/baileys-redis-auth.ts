@@ -66,9 +66,14 @@ export const useRedisAuthState = async (
                     const pipeline = redis.pipeline();
 
                     for (const category in data) {
-                        for (const id in data[category]) {
-                            const value = data[category][id];
-                            const key = `${keyPrefix}${category}:${id}`;
+                        const cat = category as keyof typeof data;
+                        const items = data[cat];
+
+                        if (!items) continue;
+
+                        for (const id in items) {
+                            const value = items[id];
+                            const key = `${keyPrefix}${cat}:${id}`;
                             if (value) {
                                 pipeline.set(key, JSON.stringify(value, BufferJSON.replacer));
                             } else {
