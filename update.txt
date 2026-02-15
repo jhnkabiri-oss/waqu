@@ -1,0 +1,9 @@
+
+#UPDATE FITUR
+- di dalam section auto create grup ada opsi nama grup dan deskripsi grup (text area), dan delay add grup 2-15 detik (selection)
+- untuk fitur vcf itu adalah dari file txt kosong tanpa nama, jadi namanya masih kosong, makanya harus ada tambahan input nama
+    contact contoh add nama kontak nya FALO1, FALO2, FALO3, dst form nya nama dan prefix 1-selesai terus disambung 200-selesai
+
+#NEW FITUR
+- tambah fitur auto split kontak dari import txt,vcf dll untuk membagi jumlah kontak yang tersedia di file tersebut, contoh :
+    jumlah kontak 1000, split per 200, maka akan ada 5 file, masing-masing file berisi 200 kontak, terus ada live preview jumlah kontak yang tersedia di file tersebut untuk bisa copas langsung dan download

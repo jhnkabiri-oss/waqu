@@ -1,0 +1,106 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+
+export default function LoginPage() {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+    const router = useRouter();
+    const supabase = createSupabaseBrowserClient();
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+
+        try {
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (signInError) {
+                setError(signInError.message);
+            } else {
+                router.push('/');
+                router.refresh();
+            }
+        } catch (err) {
+            setError('Something went wrong');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div style={{
+            display: 'flex',
+            minHeight: '100vh',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--bg-primary)',
+            padding: '20px',
+        }}>
+            <div className="card" style={{ width: '100%', maxWidth: '400px', padding: '32px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔐</div>
+                    <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--text-primary)' }}>Welcome Back</h1>
+                    <p style={{ color: 'var(--text-secondary)' }}>Sign in to manage your WhatsApp groups</p>
+                </div>
+
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group">
+                        <label className="form-label">Email</label>
+                        <input
+                            type="email"
+                            className="form-input"
+                            placeholder="your@email.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Password</label>
+                        <input
+                            type="password"
+                            className="form-input"
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                        />
+                    </div>
+
+                    {error && (
+                        <div style={{
+                            padding: '12px',
+                            marginBottom: '16px',
+                            background: 'rgba(255, 107, 107, 0.1)',
+                            color: '#ff6b6b',
+                            borderRadius: 'var(--radius-sm)',
+                            fontSize: '14px',
+                            textAlign: 'center',
+                        }}>
+                            {error}
+                        </div>
+                    )}
+
+                    <button
+                        type="submit"
+                        className="btn btn-primary"
+                        style={{ width: '100%', justifyContent: 'center' }}
+                        disabled={loading}
+                    >
+                        {loading ? <span className="spinner" /> : 'Login'}
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+}

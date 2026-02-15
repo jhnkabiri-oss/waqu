@@ -9,14 +9,30 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@prisma/client": "^5.22.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.95.3",
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "bullmq": "^5.69.1",
+    "googleapis": "^171.4.0",
+    "ioredis": "^5.9.3",
     "next": "16.1.6",
+    "pino": "^10.3.1",
+    "prisma": "^5.22.0",
+    "qrcode": "^1.5.4",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/uuid": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "typescript": "^5"
