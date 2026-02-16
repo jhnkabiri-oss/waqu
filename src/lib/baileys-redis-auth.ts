@@ -1,14 +1,40 @@
 
 import { AuthenticationCreds, AuthenticationState, BufferJSON, initAuthCreds, SignalDataTypeMap } from '@whiskeysockets/baileys';
-import { kv } from '@vercel/kv';
+import Redis from 'ioredis';
+
+// Singleton Redis client
+let redisClient: Redis | null = null;
+
+const getRedisClient = () => {
+    if (!redisClient) {
+        // Use REDIS_URL from environment or fallback
+        const url = process.env.REDIS_URL || process.env.KV_URL || 'redis://localhost:6379';
+        console.log('[RedisAuth] Connecting to Redis at:', url.replace(/:[^:@]+@/, ':****@')); // Mask password
+        redisClient = new Redis(url, {
+            // Options for robust connection
+            retryStrategy: (times) => {
+                const delay = Math.min(times * 50, 2000);
+                return delay;
+            },
+            maxRetriesPerRequest: null,
+        });
+
+        redisClient.on('error', (err) => console.error('[RedisAuth] Redis Client Error', err));
+        redisClient.on('connect', () => console.log('[RedisAuth] Redis Client Connected'));
+    }
+    return redisClient;
+};
+
 
 export const useRedisAuthState = async (keyPrefix: string): Promise<{ state: AuthenticationState, saveCreds: () => Promise<void> }> => {
+    const redis = getRedisClient();
+
     // 1. Load credentials
     const readData = async (key: string) => {
         try {
-            const data = await kv.get(key);
+            const data = await redis.get(key);
             if (data) {
-                return JSON.parse(JSON.stringify(data), BufferJSON.reviver);
+                return JSON.parse(data, BufferJSON.reviver);
             }
             return null;
         } catch (error) {
@@ -19,7 +45,7 @@ export const useRedisAuthState = async (keyPrefix: string): Promise<{ state: Aut
 
     const writeData = async (data: any, key: string) => {
         try {
-            await kv.set(key, JSON.stringify(data, BufferJSON.replacer));
+            await redis.set(key, JSON.stringify(data, BufferJSON.replacer));
         } catch (error) {
             console.error('Redis write error:', error);
         }
@@ -27,7 +53,7 @@ export const useRedisAuthState = async (keyPrefix: string): Promise<{ state: Aut
 
     const removeData = async (key: string) => {
         try {
-            await kv.del(key);
+            await redis.del(key);
         } catch (error) {
             console.error('Redis delete error:', error);
         }
@@ -56,7 +82,7 @@ export const useRedisAuthState = async (keyPrefix: string): Promise<{ state: Aut
                     const tasks: Promise<void>[] = [];
                     for (const category in data) {
                         for (const id in data[category]) {
-                            const value = data[category][id];
+                            const value = (data as any)[category][id];
                             const key = `${keyPrefix}${category}:${id}`;
                             if (value) {
                                 tasks.push(writeData(value, key));
@@ -76,14 +102,24 @@ export const useRedisAuthState = async (keyPrefix: string): Promise<{ state: Aut
 };
 
 export const clearRedisAuthState = async (keyPrefix: string) => {
+    const redis = getRedisClient();
     try {
-        // Pattern deletion is tricky in KV without keys command which is expensive/blocked
-        // We might need to iterate or rely on good key management
-        // For now, at least clear creds
-        const keys = await kv.keys(`${keyPrefix}*`);
-        if (keys.length > 0) {
-            await kv.del(...keys);
-        }
+        // Pattern deletion requires scanning
+        const stream = redis.scanStream({
+            match: `${keyPrefix}*`,
+            count: 100
+        });
+
+        stream.on('data', (keys) => {
+            if (keys.length > 0) {
+                redis.del(...keys);
+            }
+        });
+
+        stream.on('end', () => {
+            // Done
+        });
+
     } catch (error) {
         console.error('Redis clear error:', error);
     }
