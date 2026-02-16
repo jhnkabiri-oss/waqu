@@ -278,21 +278,34 @@ export class WAClient extends EventEmitter {
 
                 if (this.isPairingMode) return;
 
+                // CRITICAL FIX: Only delete session if explicitly logged out (401)
+                // Do NOT delete on 500, 408, 515 or undefined errors.
                 if (statusCode === DisconnectReason.loggedOut) {
+                    console.warn(`[WA-${this.userId}-${this.profileId}] ⚠️ Session expired/logged out. Cleaning up.`);
                     this.connectionStatus = 'disconnected';
                     this.phoneNumber = null;
                     this.socket = null;
                     this.reconnectAttempts = 0;
                     this.emit('status', this.getStatus());
                     this.emit('logged-out');
+
+                    // Only remove from Redis if truly logged out
                     redis.srem('wa:active_sessions', `${this.userId}:${this.profileId}`);
                     clearRedisAuthState(redis, this.redisPrefix);
                 } else if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                    // Exponential backoff: 2s, 4s, 8s, 16s, 32s
+                    const delay = Math.pow(2, this.reconnectAttempts) * 1000;
+                    console.log(`[WA-${this.userId}-${this.profileId}] 🔄 Reconnecting in ${delay}ms... (Attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
+
                     this.reconnectAttempts++;
                     this.connectionStatus = 'connecting';
                     this.emit('status', this.getStatus());
-                    setTimeout(() => this.connect(), 3000);
+
+                    setTimeout(() => {
+                        this.connect().catch(err => console.error(`[WA-${this.userId}-${this.profileId}] Reconnect failed:`, err));
+                    }, delay);
                 } else {
+                    console.error(`[WA-${this.userId}-${this.profileId}] ❌ Max reconnect attempts reached.`);
                     this.connectionStatus = 'disconnected';
                     this.emit('status', this.getStatus());
                 }

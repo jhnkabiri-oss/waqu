@@ -33,10 +33,25 @@ export async function GET(req: NextRequest) {
 
         console.log(`[API-Groups] Fetching groups for profile ${profileId}...`);
         const start = Date.now();
-        const groups = await sock.groupFetchAllParticipating();
-        console.log(`[API-Groups] Fetched ${Object.keys(groups).length} groups in ${Date.now() - start}ms`);
 
-        const groupList = Object.values(groups).map((g) => ({
+        // Retry logic for group fetch
+        let groups;
+        let fetchRetries = 3;
+        while (fetchRetries > 0) {
+            try {
+                groups = await sock.groupFetchAllParticipating();
+                break;
+            } catch (err) {
+                console.warn(`[API-Groups] Fetch failed, retrying... (${fetchRetries} left)`, err);
+                fetchRetries--;
+                if (fetchRetries === 0) throw err;
+                await new Promise(r => setTimeout(r, 2000)); // Wait 2s before retry
+            }
+        }
+
+        console.log(`[API-Groups] Fetched ${Object.keys(groups || {}).length} groups in ${Date.now() - start}ms`);
+
+        const groupList = Object.values(groups || {}).map((g) => ({
             id: g.id,
             subject: g.subject,
             desc: g.desc,
