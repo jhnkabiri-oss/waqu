@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { broadcastQueue } from '@/lib/queue';
+import { broadcastQueue } from '@/lib/queue-supabase';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     try {
-        const { recipients, message, minDelay = 10, maxDelay = 30, profileId } = await req.json();
+        const supabase = await createSupabaseServerClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const json = await req.json();
+        const { recipients, message, minDelay = 10, maxDelay = 30, profileId } = json;
 
         if (!profileId) {
             return NextResponse.json({ error: 'Profile ID Required' }, { status: 400 });
@@ -31,9 +34,8 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const jobId = `broadcast_${user.id}_${Date.now()}`;
+        // Add job to Supabase queue
         const job = await broadcastQueue.add('send-broadcast', {
-            jobId,
             userId: user.id,
             profileId,
             recipients: recipients.map((r: string) => {
@@ -50,7 +52,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             message: `Broadcast queued for ${recipients.length} recipients`,
             jobId: job.id,
-            broadcastId: jobId,
         });
     } catch (error) {
         return NextResponse.json(

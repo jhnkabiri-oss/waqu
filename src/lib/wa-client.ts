@@ -8,8 +8,8 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import { EventEmitter } from 'events';
-import { useRedisAuthState, clearRedisAuthState } from './baileys-redis-auth';
-import { redis } from './redis';
+import { useSupabaseAuthState, clearSupabaseAuthState } from './baileys-supabase-auth';
+import { supabaseAdmin } from './supabase-admin';
 
 const logger = pino({ level: 'silent' });
 const MAX_PROFILES_PER_USER = 10;
@@ -26,7 +26,7 @@ export class WAClient extends EventEmitter {
     private isPairingMode = false;
     public readonly profileId: string;
     public readonly userId: string;
-    private redisPrefix: string;
+    private sessionPrefix: string;
 
     constructor(userId: string, profileId: string) {
         super();
@@ -34,7 +34,7 @@ export class WAClient extends EventEmitter {
         this.userId = userId;
         this.profileId = profileId;
         // Key: wa:sess:USER_ID:profile-ID:
-        this.redisPrefix = `${SESSION_PREFIX}${userId}:profile-${profileId}:`;
+        this.sessionPrefix = `${SESSION_PREFIX}${userId}:profile-${profileId}:`;
     }
 
     getStatus() {
@@ -71,7 +71,7 @@ export class WAClient extends EventEmitter {
         this.emit('status', this.getStatus());
 
         try {
-            const { state, saveCreds } = await useRedisAuthState(redis, this.redisPrefix);
+            const { state, saveCreds } = await useSupabaseAuthState(this.sessionPrefix);
             const { version } = await fetchLatestBaileysVersion();
 
             this.socket = makeWASocket({
@@ -87,8 +87,8 @@ export class WAClient extends EventEmitter {
             this.socket.ev.on('creds.update', saveCreds);
             this.setupConnectionListener();
 
-            // Register as active session
-            await redis.sadd('wa:active_sessions', `${this.userId}:${this.profileId}`);
+            // We no longer need to explicitly register active sessions in a separate list
+            // Existence of 'wa:sess:...:creds' in Supabase is enough source of truth.
         } catch (error) {
             console.error(`[WA-${this.userId}-${this.profileId}] Connection error:`, error);
             this.connectionStatus = 'disconnected';
@@ -160,9 +160,9 @@ export class WAClient extends EventEmitter {
         this.emit('status', this.getStatus());
 
         try {
-            await clearRedisAuthState(redis, this.redisPrefix);
+            await clearSupabaseAuthState(this.sessionPrefix);
 
-            const { state, saveCreds } = await useRedisAuthState(redis, this.redisPrefix);
+            const { state, saveCreds } = await useSupabaseAuthState(this.sessionPrefix);
             const { version } = await fetchLatestBaileysVersion();
 
             const sock = makeWASocket({
@@ -177,9 +177,6 @@ export class WAClient extends EventEmitter {
 
             this.socket = sock;
             sock.ev.on('creds.update', saveCreds);
-
-            // Register as active session
-            await redis.sadd('wa:active_sessions', `${this.userId}:${this.profileId}`);
 
             const code = await new Promise<string>((resolve, reject) => {
                 const timeout = setTimeout(() => {
@@ -289,9 +286,8 @@ export class WAClient extends EventEmitter {
                     this.emit('status', this.getStatus());
                     this.emit('logged-out');
 
-                    // Only remove from Redis if truly logged out
-                    redis.srem('wa:active_sessions', `${this.userId}:${this.profileId}`);
-                    clearRedisAuthState(redis, this.redisPrefix);
+                    // Remove from Supabase
+                    clearSupabaseAuthState(this.sessionPrefix);
                 } else if (this.reconnectAttempts < this.maxReconnectAttempts) {
                     // Exponential backoff: 2s, 4s, 8s, 16s, 32s
                     const delay = Math.pow(2, this.reconnectAttempts) * 1000;
@@ -334,8 +330,7 @@ export class WAClient extends EventEmitter {
             } catch { /* ignore */ }
             this.socket = null;
         }
-        await clearRedisAuthState(redis, this.redisPrefix);
-        await redis.srem('wa:active_sessions', `${this.userId}:${this.profileId}`);
+        await clearSupabaseAuthState(this.sessionPrefix);
 
         this.connectionStatus = 'disconnected';
         this.currentQR = null;
@@ -430,34 +425,40 @@ class WAClientManager {
         }
     }
 
-    // Auto-connect profiles that have saved sessions in Redis
+    // Auto-connect profiles that have saved sessions in Supabase
     async autoReconnect(): Promise<void> {
         try {
-            // Get all active sessions from Redis Set
-            const activeSessions = await redis.smembers('wa:active_sessions');
+            // Find all unique profiles that have a 'creds' key in Supabase
+            // Key format: wa:sess:USER_ID:profile-ID:creds
+            const { data, error } = await supabaseAdmin
+                .from('wa_sessions')
+                .select('key')
+                .like('key', '%:creds');
 
-            console.log(`[WAManager] Found ${activeSessions.length} active sessions to reconnect`);
+            if (error) throw error;
 
-            for (const sessionKey of activeSessions) {
-                // key is "userId:profileId"
-                const [userId, profileId] = sessionKey.split(':');
-                if (!userId || !profileId) continue;
+            console.log(`[WAManager] Found ${data?.length || 0} saved sessions in Supabase`);
 
-                console.log(`[WAManager] Auto-reconnecting User ${userId} Profile ${profileId}...`);
-                try {
-                    const client = this.getOrCreateClient(userId, profileId);
-                    // Check if creds exist
-                    const credsKey = `${SESSION_PREFIX}${userId}:profile-${profileId}:creds`;
-                    const hasCreds = await redis.exists(credsKey);
+            if (data && data.length > 0) {
+                for (const row of data) {
+                    const key = (row as any).key;
+                    // Extract userId and profileId
+                    // Format: wa:sess:USER_ID:profile-ID:creds
+                    // Regex capture
+                    const match = key.match(/^wa:sess:(.+):profile-(.+):creds$/);
 
-                    if (hasCreds) {
-                        await client.connect();
-                    } else {
-                        // Cleanup invalid session
-                        await redis.srem('wa:active_sessions', sessionKey);
+                    if (match) {
+                        const userId = match[1];
+                        const profileId = match[2];
+
+                        console.log(`[WAManager] Auto-reconnecting User ${userId} Profile ${profileId}...`);
+                        try {
+                            const client = this.getOrCreateClient(userId, profileId);
+                            await client.connect();
+                        } catch (err) {
+                            console.error(`[WAManager] Failed to reconnect User ${userId} Profile ${profileId}:`, err);
+                        }
                     }
-                } catch (err) {
-                    console.error(`[WAManager] Failed to reconnect User ${userId} Profile ${profileId}:`, err);
                 }
             }
         } catch (error) {

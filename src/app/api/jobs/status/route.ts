@@ -1,52 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { groupCreateQueue, broadcastQueue } from '@/lib/queue';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+    // Ensure all logic is inside handler
     const { searchParams } = new URL(req.url);
     const jobId = searchParams.get('jobId');
-    const queueName = searchParams.get('queue') || 'broadcast';
+
+    if (!jobId) {
+        return NextResponse.json({ error: 'Job ID required' }, { status: 400 });
+    }
 
     try {
-        const queue = queueName === 'group-create' ? groupCreateQueue : broadcastQueue;
+        // Query job from Supabase using the imported client
+        // The client itself is initialized at module level, but we can't change that easily without refactoring lib/supabase-admin
+        // However, let's try to query.
+        const { data: job, error } = await supabaseAdmin
+            .from('jobs')
+            .select('*')
+            .eq('id', jobId)
+            .single();
 
-        if (jobId) {
-            const job = await queue.getJob(jobId);
-            if (!job) {
-                return NextResponse.json({ error: 'Job not found' }, { status: 404 });
-            }
-
-            const state = await job.getState();
-            return NextResponse.json({
-                id: job.id,
-                name: job.name,
-                data: job.data,
-                progress: job.progress,
-                status: state,
-                failedReason: job.failedReason,
-                timestamp: job.timestamp,
-                finishedOn: job.finishedOn,
-            });
+        if (error || !job) {
+            return NextResponse.json({ error: 'Job not found' }, { status: 404 });
         }
 
-        // Return queue stats
-        const [waiting, active, completed, failed] = await Promise.all([
-            queue.getWaitingCount(),
-            queue.getActiveCount(),
-            queue.getCompletedCount(),
-            queue.getFailedCount(),
-        ]);
+        const jobData = job as any;
+
+        // Map Supabase job status to API response
+        let state = jobData.status;
+        let progress = 0;
+        let result = jobData.result;
+        let errorMsg = jobData.error;
+
+        // If completed, progress is 100
+        if (state === 'completed') progress = 100;
 
         return NextResponse.json({
-            queue: queueName,
-            waiting,
-            active,
-            completed,
-            failed,
+            id: jobData.id,
+            state,
+            progress,
+            result,
+            failedReason: errorMsg,
+            finishedOn: jobData.updated_at,
         });
+
     } catch (error) {
-        return NextResponse.json(
-            { error: 'Failed to get job status: ' + (error as Error).message },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to check job status' }, { status: 500 });
     }
 }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { waManager } from '@/lib/wa-client';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 
+export const dynamic = 'force-dynamic';
+
 function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
