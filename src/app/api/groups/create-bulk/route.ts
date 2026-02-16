@@ -33,19 +33,14 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const client = waManager.getClient(user.id, profileId);
-        if (!client || !client.isConnected()) {
-            return NextResponse.json(
-                { error: `WhatsApp Profile ${profileId} not connected. Please connect first.` },
-                { status: 400 }
-            );
-        }
-
+        const client = waManager.getOrCreateClient(user.id, profileId);
+        const isConnected = await client.waitForConnection(30000);
         const socket = client.getSocket();
-        if (!socket) {
+
+        if (!socket || !isConnected) {
             return NextResponse.json(
-                { error: 'WhatsApp socket not available.' },
-                { status: 500 }
+                { error: `WhatsApp Profile ${profileId} not connected or failed to reconnect.` },
+                { status: 400 }
             );
         }
 

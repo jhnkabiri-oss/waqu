@@ -18,12 +18,15 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Profile ID Required' }, { status: 400 });
         }
 
-        const client = waManager.getClient(user.id, profileId);
-        const sock = client?.getSocket();
+        const client = waManager.getOrCreateClient(user.id, profileId);
 
-        if (!sock || !client?.isConnected()) {
+        // Wait for connection (lazy reconnect for serverless)
+        const isConnected = await client.waitForConnection(30000);
+        const sock = client.getSocket();
+
+        if (!sock || !isConnected) {
             return NextResponse.json(
-                { error: 'WhatsApp not connected' },
+                { error: 'WhatsApp not connected or failed to reconnect' },
                 { status: 400 }
             );
         }
@@ -67,12 +70,13 @@ export async function PUT(req: NextRequest) {
             return NextResponse.json({ error: 'Profile ID Required' }, { status: 400 });
         }
 
-        const client = waManager.getClient(user.id, profileId);
-        const sock = client?.getSocket();
+        const client = waManager.getOrCreateClient(user.id, profileId);
+        const isConnected = await client.waitForConnection(30000);
+        const sock = client.getSocket();
 
-        if (!sock || !client?.isConnected()) {
+        if (!sock || !isConnected) {
             return NextResponse.json(
-                { error: 'WhatsApp not connected' },
+                { error: 'WhatsApp not connected or failed to reconnect' },
                 { status: 400 }
             );
         }

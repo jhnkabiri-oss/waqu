@@ -57,7 +57,12 @@ export class WAClient extends EventEmitter {
     }
 
     async connect(): Promise<void> {
-        if (this.connectionStatus === 'connected') {
+        if (this.connectionStatus === 'connected' && this.socket) {
+            return;
+        }
+
+        // Check if we are already connecting to avoid multiple attempts
+        if (this.connectionStatus === 'connecting' && this.socket) {
             return;
         }
 
@@ -90,6 +95,44 @@ export class WAClient extends EventEmitter {
             this.emit('status', this.getStatus());
             throw error;
         }
+    }
+
+    /**
+     * Waits for the connection to be established.
+     * Useful for serverless environments where we need to ensure connection before doing work.
+     */
+    async waitForConnection(timeoutMs = 15000): Promise<boolean> {
+        if (this.connectionStatus === 'connected') return true;
+
+        // If not connecting, start it
+        if (this.connectionStatus !== 'connecting') {
+            await this.connect();
+        }
+
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                cleanup();
+                resolve(this.connectionStatus === 'connected');
+            }, timeoutMs);
+
+            const onStatus = (status: any) => {
+                if (status.status === 'connected') {
+                    cleanup();
+                    resolve(true);
+                } else if (status.status === 'disconnected' && !this.isPairingMode) {
+                    // If it specifically failed and isn't waiting for a code
+                    cleanup();
+                    resolve(false);
+                }
+            };
+
+            const cleanup = () => {
+                this.removeListener('status', onStatus);
+                clearTimeout(timeout);
+            };
+
+            this.on('status', onStatus);
+        });
     }
 
     async connectWithCode(phone: string): Promise<string> {
