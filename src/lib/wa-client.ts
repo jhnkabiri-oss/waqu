@@ -18,7 +18,7 @@ const SESSION_PREFIX = 'wa:sess:';
 
 export class WAClient extends EventEmitter {
     private socket: WASocket | null = null;
-    private connectionStatus: 'disconnected' | 'connecting' | 'qr' | 'pairing' | 'connected' = 'disconnected';
+    public connectionStatus: 'disconnected' | 'connecting' | 'qr' | 'pairing' | 'connected' = 'disconnected';
     private currentQR: string | null = null;
     private pairingCode: string | null = null;
     private phoneNumber: string | null = null;

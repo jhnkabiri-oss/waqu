@@ -30,5 +30,24 @@ export async function GET(req: NextRequest) {
     }
 
     // Return all profiles for this user
-    return NextResponse.json({ profiles: waManager.getUserStatuses(user.id) });
+    const profiles = waManager.getUserStatuses(user.id);
+
+    // AUTO-WAKE: If Default Profile 1 is disconnected (meaning likely not in memory due to server restart),
+    // trigger a connection attempt so it restores from Redis.
+    const p1 = profiles.find(p => p.profileId === '1');
+    if (p1 && p1.status === 'disconnected') {
+        const client = waManager.getOrCreateClient(user.id, '1');
+        // Only connect if not already connecting
+        if (client.connectionStatus === 'disconnected') {
+            console.log(`[API-Status] Auto-waking up Profile 1 for user ${user.id}`);
+            client.connect().catch(e => console.error(`[API-Status] Auto-wake failed:`, e));
+            // Show connecting immediately to user
+            p1.status = 'connecting';
+        } else {
+            // It might be connecting or in other state
+            p1.status = client.connectionStatus;
+        }
+    }
+
+    return NextResponse.json({ profiles });
 }
