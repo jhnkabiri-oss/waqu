@@ -8,8 +8,9 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import { EventEmitter } from 'events';
-import { useSupabaseAuthState, clearSupabaseAuthState } from './baileys-supabase-auth';
-import { supabaseAdmin } from './supabase-admin';
+import { useRedisAuthState, clearRedisAuthState } from './baileys-redis-auth';
+// import { useSupabaseAuthState, clearSupabaseAuthState } from './baileys-supabase-auth';
+// import { supabaseAdmin } from './supabase-admin';
 
 const logger = pino({ level: 'silent' });
 const MAX_PROFILES_PER_USER = 10;
@@ -74,7 +75,7 @@ export class WAClient extends EventEmitter {
         this.emit('status', this.getStatus());
 
         try {
-            const { state, saveCreds } = await useSupabaseAuthState(this.sessionPrefix);
+            const { state, saveCreds } = await useRedisAuthState(this.sessionPrefix);
             const { version } = await fetchLatestBaileysVersion();
 
             this.socket = makeWASocket({
@@ -182,9 +183,9 @@ export class WAClient extends EventEmitter {
         this.emit('status', this.getStatus());
 
         try {
-            await clearSupabaseAuthState(this.sessionPrefix);
+            await clearRedisAuthState(this.sessionPrefix);
 
-            const { state, saveCreds } = await useSupabaseAuthState(this.sessionPrefix);
+            const { state, saveCreds } = await useRedisAuthState(this.sessionPrefix);
             const { version } = await fetchLatestBaileysVersion();
 
             const sock = makeWASocket({
@@ -308,8 +309,8 @@ export class WAClient extends EventEmitter {
                     this.emit('status', this.getStatus());
                     this.emit('logged-out');
 
-                    // Remove from Supabase
-                    clearSupabaseAuthState(this.sessionPrefix);
+                    // Remove from Redis
+                    clearRedisAuthState(this.sessionPrefix);
                 } else if (this.reconnectAttempts < this.maxReconnectAttempts) {
                     // Exponential backoff: 2s, 4s, 8s, 16s, 32s
                     const delay = Math.pow(2, this.reconnectAttempts) * 1000;
@@ -352,7 +353,7 @@ export class WAClient extends EventEmitter {
             } catch { /* ignore */ }
             this.socket = null;
         }
-        await clearSupabaseAuthState(this.sessionPrefix);
+        await clearRedisAuthState(this.sessionPrefix);
 
         this.connectionStatus = 'disconnected';
         this.currentQR = null;
@@ -463,43 +464,14 @@ class WAClientManager {
     }
 
     // Auto-connect profiles that have saved sessions in Supabase
-    async autoReconnect(): Promise<void> {
+    // Auto-connect profiles (Lazy load strategy for Redis)
+    async autoReconnect() {
         try {
-            // Find all unique profiles that have a 'creds' key in Supabase
-            // Key format: wa:sess:USER_ID:profile-ID:creds
-            const { data, error } = await supabaseAdmin
-                .from('wa_sessions')
-                .select('key')
-                .like('key', '%:creds');
-
-            if (error) throw error;
-
-            console.log(`[WAManager] Found ${data?.length || 0} saved sessions in Supabase`);
-
-            if (data && data.length > 0) {
-                for (const row of data) {
-                    const key = (row as any).key;
-                    // Extract userId and profileId
-                    // Format: wa:sess:USER_ID:profile-ID:creds
-                    // Regex capture
-                    const match = key.match(/^wa:sess:(.+):profile-(.+):creds$/);
-
-                    if (match) {
-                        const userId = match[1];
-                        const profileId = match[2];
-
-                        console.log(`[WAManager] Auto-reconnecting User ${userId} Profile ${profileId}...`);
-                        try {
-                            const client = this.getOrCreateClient(userId, profileId);
-                            await client.connect();
-                        } catch (err) {
-                            console.error(`[WAManager] Failed to reconnect User ${userId} Profile ${profileId}:`, err);
-                        }
-                    }
-                }
-            }
+            console.log('[WAManager] Auto-reconnect started (Lazy loading strategy for Redis)');
+            // For Redis/Vercel KV, we don't scan all keys.
+            // Expected behavior: Client connects when user visits page or via explicit call.
         } catch (error) {
-            console.error('[WAManager] Auto-reconnect failed:', error);
+            console.error('[WAManager] Auto-reconnect error:', error);
         }
     }
 }
