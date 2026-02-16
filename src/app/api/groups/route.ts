@@ -34,24 +34,42 @@ export async function GET(req: NextRequest) {
         console.log(`[API-Groups] Fetching groups for profile ${profileId}...`);
         const start = Date.now();
 
-        // Retry logic for group fetch
-        let groups;
-        let fetchRetries = 3;
-        while (fetchRetries > 0) {
-            try {
-                groups = await sock.groupFetchAllParticipating();
-                break;
-            } catch (err) {
-                console.warn(`[API-Groups] Fetch failed, retrying... (${fetchRetries} left)`, err);
-                fetchRetries--;
-                if (fetchRetries === 0) throw err;
-                await new Promise(r => setTimeout(r, 2000)); // Wait 2s before retry
+        // 1. Try to get from local cache first if available
+        let groups = {};
+        if (client.groupCache.size > 0) {
+            console.log(`[API-Groups] Using cached groups (${client.groupCache.size})`);
+            groups = Object.fromEntries(client.groupCache);
+        }
+
+        // 2. If empty, try to fetch
+        if (Object.keys(groups).length === 0) {
+            // Retry logic for group fetch
+            let fetchRetries = 3;
+            while (fetchRetries > 0) {
+                try {
+                    console.log(`[API-Groups] Cache empty, fetching from socket...`);
+                    groups = await sock.groupFetchAllParticipating();
+
+                    // Update cache
+                    if (groups) {
+                        Object.values(groups).forEach((g: any) => client.groupCache.set(g.id, g));
+                    }
+                    break;
+                } catch (err) {
+                    console.warn(`[API-Groups] Fetch failed, retrying... (${fetchRetries} left)`, err);
+                    fetchRetries--;
+                    if (fetchRetries === 0) {
+                        // Don't throw, just return empty list to avoid crashing UI
+                        console.error('Final group fetch failed:', err);
+                    }
+                    await new Promise(r => setTimeout(r, 2000)); // Wait 2s before retry
+                }
             }
         }
 
         console.log(`[API-Groups] Fetched ${Object.keys(groups || {}).length} groups in ${Date.now() - start}ms`);
 
-        const groupList = Object.values(groups || {}).map((g) => ({
+        const groupList = Object.values(groups || {}).map((g: any) => ({
             id: g.id,
             subject: g.subject,
             desc: g.desc,

@@ -14,6 +14,7 @@ export const useSupabaseAuthState = async (
 
     const writeData = async (data: any, key: string) => {
         try {
+            console.log(`[SupabaseAuth] Writing ${key}`);
             const { error } = await (supabaseAdmin
                 .from('wa_sessions') as any)
                 .upsert({
@@ -41,9 +42,11 @@ export const useSupabaseAuthState = async (
             }
 
             if (!data || !data.value) {
+                console.log(`[SupabaseAuth] Read ${key} -> NOT FOUND`);
                 return null;
             }
 
+            console.log(`[SupabaseAuth] Read ${key} -> FOUND (${data.value.length} bytes)`);
             return JSON.parse(data.value, BufferJSON.reviver);
         } catch (error) {
             console.error('Supabase read error:', error);

@@ -27,6 +27,8 @@ export class WAClient extends EventEmitter {
     public readonly profileId: string;
     public readonly userId: string;
     private sessionPrefix: string;
+    // Cache for groups
+    public groupCache: Map<string, any> = new Map();
 
     constructor(userId: string, profileId: string) {
         super();
@@ -45,6 +47,7 @@ export class WAClient extends EventEmitter {
             qr: this.currentQR,
             pairingCode: this.pairingCode,
             phoneNumber: this.phoneNumber,
+            groupsCount: this.groupCache.size // Expose count
         };
     }
 
@@ -79,13 +82,32 @@ export class WAClient extends EventEmitter {
                 auth: state,
                 logger,
                 browser: Browsers.ubuntu('Chrome'),
-                generateHighQualityLinkPreview: false,
-                syncFullHistory: false,
+                generateHighQualityLinkPreview: true,
+                syncFullHistory: true, // Enable full history to ensure groups are synced
                 connectTimeoutMs: 60000,
             });
 
             this.socket.ev.on('creds.update', saveCreds);
             this.setupConnectionListener();
+
+            // Group Listeners
+            this.socket.ev.on('groups.upsert', (newGroups) => {
+                console.log(`[WA-${this.userId}-${this.profileId}] Groups upsert: ${newGroups.length}`);
+                newGroups.forEach(g => {
+                    if (g.id) {
+                        this.groupCache.set(g.id, { ...this.groupCache.get(g.id), ...g });
+                    }
+                });
+            });
+
+            this.socket.ev.on('groups.update', (updatedGroups) => {
+                console.log(`[WA-${this.userId}-${this.profileId}] Groups update: ${updatedGroups.length}`);
+                updatedGroups.forEach(g => {
+                    if (g.id && this.groupCache.has(g.id)) {
+                        this.groupCache.set(g.id, { ...this.groupCache.get(g.id), ...g });
+                    }
+                });
+            });
 
             // We no longer need to explicitly register active sessions in a separate list
             // Existence of 'wa:sess:...:creds' in Supabase is enough source of truth.
@@ -140,7 +162,7 @@ export class WAClient extends EventEmitter {
             return '';
         }
 
-        const cleanPhone = phone.replace(/[^0-9]/g, '');
+        const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
         if (!cleanPhone || cleanPhone.length < 10) {
             throw new Error('Invalid phone number. Example: 628123456789');
         }
@@ -170,8 +192,8 @@ export class WAClient extends EventEmitter {
                 auth: state,
                 logger,
                 browser: Browsers.ubuntu('Chrome'),
-                generateHighQualityLinkPreview: false,
-                syncFullHistory: false,
+                generateHighQualityLinkPreview: true,
+                syncFullHistory: false, // Revert to false to prevent conflict
                 connectTimeoutMs: 60000,
             });
 
@@ -196,7 +218,7 @@ export class WAClient extends EventEmitter {
                         codeRequested = true;
                         try {
                             console.log(`[WA-${this.userId}-${this.profileId}] Requesting pairing code for:`, cleanPhone);
-                            const pCode = await sock.requestPairingCode(cleanPhone);
+                            const pCode = await sock.requestPairingCode(cleanPhone || '');
                             clearTimeout(timeout);
 
                             this.pairingCode = pCode;
@@ -405,8 +427,23 @@ class WAClientManager {
                 return parseInt(pA) - parseInt(pB);
             });
 
+        // Debug log
         if (userEntries.length === 0) {
-            return [{ userId, profileId: '1', status: 'disconnected', qr: null, pairingCode: null, phoneNumber: null }];
+            // console.log(`[WAManager] No clients found for user ${userId} in memory map of size ${this.clients.size}`);
+        } else {
+            // console.log(`[WAManager] Found ${userEntries.length} clients for user ${userId}`);
+        }
+
+        if (userEntries.length === 0) {
+            return [{
+                userId,
+                profileId: '1',
+                status: 'disconnected',
+                qr: null,
+                pairingCode: null,
+                phoneNumber: null,
+                groupsCount: 0
+            }];
         }
 
         for (const [, client] of userEntries) {
@@ -469,8 +506,18 @@ class WAClientManager {
 
 // Singleton manager
 const globalForWA = globalThis as unknown as { waManager: WAClientManager | undefined };
-export const waManager = globalForWA.waManager ?? new WAClientManager();
-if (process.env.NODE_ENV !== 'production') globalForWA.waManager = waManager;
 
-// Auto-reconnect saved sessions on startup
-waManager.autoReconnect().catch(console.error);
+if (!globalForWA.waManager) {
+    console.log('[WAManager] 🟢 Creating new WAClientManager instance (Singleton)');
+    globalForWA.waManager = new WAClientManager();
+} else {
+    console.log('[WAManager] ♻️ Reusing existing WAClientManager instance');
+}
+
+export const waManager = globalForWA.waManager;
+
+// Auto-reconnect saved sessions on startup (only if not already running/connected)
+// We use a small delay to ensure DB connection is ready
+setTimeout(() => {
+    waManager.autoReconnect().catch(console.error);
+}, 1000);
