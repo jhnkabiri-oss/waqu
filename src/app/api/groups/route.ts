@@ -105,27 +105,46 @@ export async function PUT(req: NextRequest) {
 
         const client = waManager.getOrCreateClient(user.id, profileId);
         const isConnected = await client.waitForConnection(30000);
-        const sock = client.getSocket();
 
-        if (!sock || !isConnected) {
+        if (!isConnected) {
             return NextResponse.json(
                 { error: 'WhatsApp not connected or failed to reconnect' },
                 { status: 400 }
             );
         }
 
+        // Helper: get a live socket, waiting for reconnection if needed
+        const getLiveSocket = async () => {
+            let sock = client.getSocket();
+            if (!sock || client.getStatus().status !== 'connected') {
+                console.log(`[API-Groups] Socket stale, waiting for reconnection...`);
+                const reconnected = await client.waitForConnection(30000);
+                if (!reconnected) throw new Error('WhatsApp disconnected and failed to reconnect');
+                sock = client.getSocket();
+            }
+            if (!sock) throw new Error('No active WhatsApp socket');
+            return sock;
+        };
+
         switch (action) {
-            case 'updateDescription':
+            case 'updateDescription': {
+                const sock = await getLiveSocket();
                 await sock.groupUpdateDescription(groupId, data.description);
                 break;
-            case 'updateSubject':
+            }
+            case 'updateSubject': {
+                const sock = await getLiveSocket();
                 await sock.groupUpdateSubject(groupId, data.subject);
                 break;
-            case 'removeParticipants':
+            }
+            case 'removeParticipants': {
+                const sock = await getLiveSocket();
                 await sock.groupParticipantsUpdate(groupId, data.participants, 'remove');
                 break;
+            }
             case 'addParticipants': {
                 try {
+                    const sock = await getLiveSocket();
                     const result = await sock.groupParticipantsUpdate(groupId, data.participants, 'add');
                     return NextResponse.json({
                         message: 'Participants add attempted',
@@ -139,17 +158,21 @@ export async function PUT(req: NextRequest) {
                     }, { status: 400 });
                 }
             }
-            case 'promoteParticipants':
+            case 'promoteParticipants': {
+                const sock = await getLiveSocket();
                 await sock.groupParticipantsUpdate(groupId, data.participants, 'promote');
                 break;
-            case 'demoteParticipants':
+            }
+            case 'demoteParticipants': {
+                const sock = await getLiveSocket();
                 await sock.groupParticipantsUpdate(groupId, data.participants, 'demote');
                 break;
+            }
             case 'bulkAddMembers':
                 // Implement safe bulk add with configurable delays
                 if (Array.isArray(data.participants) && data.participants.length > 0) {
                     const participants = data.participants;
-                    const memberDelay = Math.max(3, Math.min(30, data.delay || 5)) * 1000; // 3-30s, default 5s
+                    const memberDelay = Math.max(3, Math.min(30, data.delay || 5)) * 1000;
                     let addedCount = 0;
                     let failedCount = 0;
 
@@ -158,18 +181,20 @@ export async function PUT(req: NextRequest) {
                     for (let i = 0; i < participants.length; i++) {
                         const member = participants[i];
                         try {
-                            // Add member
+                            const sock = await getLiveSocket();
                             await sock.groupParticipantsUpdate(groupId, [member], 'add');
                             addedCount++;
                             console.log(`[Groups]   ✅ Added ${i + 1}/${participants.length}: ${member}`);
                         } catch (err) {
                             const errMsg = (err as Error).message || '';
-                            if (errMsg.includes('rate') || errMsg.includes('429')) {
-                                console.log(`[Groups]   ⚠️ Rate limited on ${member}, waiting 30s...`);
-                                await new Promise(resolve => setTimeout(resolve, 30000));
+                            if (errMsg.includes('rate') || errMsg.includes('429') || errMsg.includes('Connection Closed') || errMsg.includes('close')) {
+                                const waitTime = errMsg.includes('Connection') || errMsg.includes('close') ? 10000 : 30000;
+                                console.log(`[Groups]   ⚠️ ${errMsg.includes('Connection') ? 'Connection lost' : 'Rate limited'} on ${member}, waiting ${waitTime / 1000}s...`);
+                                await new Promise(resolve => setTimeout(resolve, waitTime));
 
-                                // Retry once
+                                // Retry once with fresh socket
                                 try {
+                                    const sock = await getLiveSocket();
                                     await sock.groupParticipantsUpdate(groupId, [member], 'add');
                                     addedCount++;
                                     console.log(`[Groups]   ✅ Retry success: ${member}`);
@@ -209,3 +234,5 @@ export async function PUT(req: NextRequest) {
         );
     }
 }
+
+
