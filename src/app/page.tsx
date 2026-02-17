@@ -23,13 +23,34 @@ export default function Dashboard() {
         const res = await fetch('/api/wa/status');
         if (res.ok) {
           const data = await res.json();
+          let isConnected = false;
+          let groupsCount = 0;
+
           // Handle new multi-profile format
           if (data.profiles && Array.isArray(data.profiles)) {
-            const anyConnected = data.profiles.some((p: any) => p.status === 'connected');
-            setStats((prev) => ({ ...prev, status: anyConnected ? 'connected' : 'disconnected' }));
+            isConnected = data.profiles.some((p: any) => p.status === 'connected');
+            // Sum up groupsCount from all connected profiles
+            groupsCount = data.profiles.reduce((sum: number, p: any) => sum + (p.groupsCount || 0), 0);
           } else if (data.status) {
-            // Fallback for unexpected format
-            setStats((prev) => ({ ...prev, status: data.status }));
+            isConnected = data.status === 'connected';
+            groupsCount = data.groupsCount || 0;
+          }
+
+          setStats((prev) => ({ ...prev, status: isConnected ? 'connected' : 'disconnected', groups: groupsCount }));
+
+          // If connected but groupsCount is 0, try fetching from groups API
+          if (isConnected && groupsCount === 0) {
+            try {
+              const gRes = await fetch('/api/groups?profileId=1');
+              if (gRes.ok) {
+                const gData = await gRes.json();
+                if (gData.groups) {
+                  setStats((prev) => ({ ...prev, groups: gData.groups.length }));
+                }
+              }
+            } catch {
+              // ignore
+            }
           }
         }
       } catch {
