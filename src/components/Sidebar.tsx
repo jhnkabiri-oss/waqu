@@ -13,6 +13,7 @@ const NAV_ITEMS = [
     { label: 'Contacts', type: 'section' as const },
     { href: '/contacts', icon: '📇', label: 'VCF Converter' },
     { href: '/contacts/google-sync', icon: '🔄', label: 'Google Sync' },
+    { href: '/contacts/validator', icon: '✅', label: 'WA Validator' },
 
     { label: 'Groups', type: 'section' as const },
     { href: '/groups', icon: '👥', label: 'Group Manager' },
