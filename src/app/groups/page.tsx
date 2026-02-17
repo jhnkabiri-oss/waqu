@@ -45,7 +45,7 @@ export default function GroupsPage() {
     const fetchGroups = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/groups?profile=${profileId}`);
+            const res = await fetch(`/api/groups?profileId=${profileId}`);
             if (!res.ok) {
                 const data = await res.json();
                 setMessage('⚠️ ' + (data.error || 'Failed to fetch'));
