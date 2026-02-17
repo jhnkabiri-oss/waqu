@@ -1,0 +1,596 @@
+2026-Feb-17 13:55:29.386593 Starting deployment of jhnkabiri-oss/waqu:main to localhost.
+2026-Feb-17 13:55:29.637081 Preparing container with helper image: ghcr.io/coollabsio/coolify-helper:1.0.12
+2026-Feb-17 13:55:29.799313 [DEBUG] [CMD]: docker stop -t 30 gcg0w4sg4sw0g044gc8o80s8
+2026-Feb-17 13:55:29.799313 [DEBUG] Error response from daemon: No such container: gcg0w4sg4sw0g044gc8o80s8
+2026-Feb-17 13:55:30.055560 [DEBUG] [CMD]: docker run -d --network coolify --name gcg0w4sg4sw0g044gc8o80s8  --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-helper:1.0.12
+2026-Feb-17 13:55:30.055560 [DEBUG] 946234904f6028ee20ed962e157317ec6c11eadfd9c23b56b9ba899b9d80ed7d
+2026-Feb-17 13:55:31.066627 [DEBUG] [CMD]: docker exec gcg0w4sg4sw0g044gc8o80s8 bash -c 'GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git ls-remote https://github.com/jhnkabiri-oss/waqu refs/heads/main'
+2026-Feb-17 13:55:31.066627 [DEBUG] 93157206e33022422f8c54dce7697528e3bb52af	refs/heads/main
+2026-Feb-17 13:55:31.093869 ----------------------------------------
+2026-Feb-17 13:55:31.107226 Importing jhnkabiri-oss/waqu:main (commit sha 93157206e33022422f8c54dce7697528e3bb52af) to /artifacts/gcg0w4sg4sw0g044gc8o80s8.
+2026-Feb-17 13:55:31.327957 [DEBUG] [CMD]: docker exec gcg0w4sg4sw0g044gc8o80s8 bash -c 'git clone --depth=1 --recurse-submodules --shallow-submodules -b 'main' 'https://github.com/jhnkabiri-oss/waqu' '/artifacts/gcg0w4sg4sw0g044gc8o80s8' && cd '/artifacts/gcg0w4sg4sw0g044gc8o80s8' && if [ -f .gitmodules ]; then sed -i "s#git@\(.*\):#https://\1/#g" '/artifacts/gcg0w4sg4sw0g044gc8o80s8'/.gitmodules || true && git submodule sync && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git submodule update --init --recursive --depth=1; fi && cd '/artifacts/gcg0w4sg4sw0g044gc8o80s8' && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git lfs pull'
+2026-Feb-17 13:55:31.327957 [DEBUG] Cloning into '/artifacts/gcg0w4sg4sw0g044gc8o80s8'...
+2026-Feb-17 13:55:32.694624 [DEBUG] [CMD]: docker exec gcg0w4sg4sw0g044gc8o80s8 bash -c 'cd /artifacts/gcg0w4sg4sw0g044gc8o80s8 && git log -1 93157206e33022422f8c54dce7697528e3bb52af --pretty=%B'
+2026-Feb-17 13:55:32.694624 [DEBUG] fix: upgrade Dockerfile to Node 20 (Baileys requires Node 20+)
+2026-Feb-17 13:55:32.918811 Image not found (rsko0gwscsk4cg8s8ksgg8w8:93157206e33022422f8c54dce7697528e3bb52af). Building new image.
+2026-Feb-17 13:55:33.761892 [DEBUG] [CMD]: docker exec gcg0w4sg4sw0g044gc8o80s8 bash -c 'cat /artifacts/gcg0w4sg4sw0g044gc8o80s8/Dockerfile'
+2026-Feb-17 13:55:33.761892 [DEBUG] # ============================
+2026-Feb-17 13:55:33.761892 [DEBUG] # Stage 1: Dependencies
+2026-Feb-17 13:55:33.761892 [DEBUG] # ============================
+2026-Feb-17 13:55:33.761892 [DEBUG] FROM node:20-alpine AS deps
+2026-Feb-17 13:55:33.761892 [DEBUG] WORKDIR /app
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] # Install dependencies needed for native modules
+2026-Feb-17 13:55:33.761892 [DEBUG] RUN apk add --no-cache libc6-compat python3 make g++
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] COPY package.json package-lock.json* ./
+2026-Feb-17 13:55:33.761892 [DEBUG] RUN npm ci --production=false
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] # ============================
+2026-Feb-17 13:55:33.761892 [DEBUG] # Stage 2: Build
+2026-Feb-17 13:55:33.761892 [DEBUG] # ============================
+2026-Feb-17 13:55:33.761892 [DEBUG] FROM node:20-alpine AS builder
+2026-Feb-17 13:55:33.761892 [DEBUG] WORKDIR /app
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] COPY --from=deps /app/node_modules ./node_modules
+2026-Feb-17 13:55:33.761892 [DEBUG] COPY . .
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] # Disable Next.js telemetry during build
+2026-Feb-17 13:55:33.761892 [DEBUG] ENV NEXT_TELEMETRY_DISABLED=1
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] # Need dummy env vars for build (Next.js validates at build time)
+2026-Feb-17 13:55:33.761892 [DEBUG] ARG NEXT_PUBLIC_APP_URL=""
+2026-Feb-17 13:55:33.761892 [DEBUG] ARG NEXT_PUBLIC_SUPABASE_URL=""
+2026-Feb-17 13:55:33.761892 [DEBUG] ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=""
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] RUN npm run build
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] # ============================
+2026-Feb-17 13:55:33.761892 [DEBUG] # Stage 3: Production Runner
+2026-Feb-17 13:55:33.761892 [DEBUG] # ============================
+2026-Feb-17 13:55:33.761892 [DEBUG] FROM node:20-alpine AS runner
+2026-Feb-17 13:55:33.761892 [DEBUG] WORKDIR /app
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] ENV NODE_ENV=production
+2026-Feb-17 13:55:33.761892 [DEBUG] ENV NEXT_TELEMETRY_DISABLED=1
+2026-Feb-17 13:55:33.761892 [DEBUG] ENV USE_FILE_STORE=true
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] # Install runtime deps
+2026-Feb-17 13:55:33.761892 [DEBUG] RUN apk add --no-cache libc6-compat curl
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] # Create non-root user
+2026-Feb-17 13:55:33.761892 [DEBUG] RUN addgroup --system --gid 1001 nodejs
+2026-Feb-17 13:55:33.761892 [DEBUG] RUN adduser --system --uid 1001 nextjs
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] # Copy built application
+2026-Feb-17 13:55:33.761892 [DEBUG] COPY --from=builder /app/public ./public
+2026-Feb-17 13:55:33.761892 [DEBUG] COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+2026-Feb-17 13:55:33.761892 [DEBUG] COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] # Create sessions directory with proper permissions
+2026-Feb-17 13:55:33.761892 [DEBUG] # This will be mounted as a persistent volume in Coolify
+2026-Feb-17 13:55:33.761892 [DEBUG] RUN mkdir -p /app/sessions && chown -R nextjs:nodejs /app/sessions
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] # Create store directory for file-based message store
+2026-Feb-17 13:55:33.761892 [DEBUG] RUN mkdir -p /app/store && chown -R nextjs:nodejs /app/store
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] USER nextjs
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] EXPOSE 3000
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] ENV PORT=3000
+2026-Feb-17 13:55:33.761892 [DEBUG] ENV HOSTNAME="0.0.0.0"
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] # Healthcheck for Coolify
+2026-Feb-17 13:55:33.761892 [DEBUG] HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+2026-Feb-17 13:55:33.761892 [DEBUG] CMD curl -f http://localhost:3000/api/wa/status || exit 1
+2026-Feb-17 13:55:33.761892 [DEBUG] 
+2026-Feb-17 13:55:33.761892 [DEBUG] CMD ["node", "server.js"]
+2026-Feb-17 13:55:34.095668 [DEBUG] Creating build-time .env file in /artifacts (outside Docker context).
+2026-Feb-17 13:55:34.591208 [DEBUG] [CMD]: docker exec gcg0w4sg4sw0g044gc8o80s8 bash -c 'cat /artifacts/gcg0w4sg4sw0g044gc8o80s8/Dockerfile'
+2026-Feb-17 13:55:34.591208 [DEBUG] # ============================
+2026-Feb-17 13:55:34.591208 [DEBUG] # Stage 1: Dependencies
+2026-Feb-17 13:55:34.591208 [DEBUG] # ============================
+2026-Feb-17 13:55:34.591208 [DEBUG] FROM node:20-alpine AS deps
+2026-Feb-17 13:55:34.591208 [DEBUG] WORKDIR /app
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] # Install dependencies needed for native modules
+2026-Feb-17 13:55:34.591208 [DEBUG] RUN apk add --no-cache libc6-compat python3 make g++
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] COPY package.json package-lock.json* ./
+2026-Feb-17 13:55:34.591208 [DEBUG] RUN npm ci --production=false
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] # ============================
+2026-Feb-17 13:55:34.591208 [DEBUG] # Stage 2: Build
+2026-Feb-17 13:55:34.591208 [DEBUG] # ============================
+2026-Feb-17 13:55:34.591208 [DEBUG] FROM node:20-alpine AS builder
+2026-Feb-17 13:55:34.591208 [DEBUG] WORKDIR /app
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] COPY --from=deps /app/node_modules ./node_modules
+2026-Feb-17 13:55:34.591208 [DEBUG] COPY . .
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] # Disable Next.js telemetry during build
+2026-Feb-17 13:55:34.591208 [DEBUG] ENV NEXT_TELEMETRY_DISABLED=1
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] # Need dummy env vars for build (Next.js validates at build time)
+2026-Feb-17 13:55:34.591208 [DEBUG] ARG NEXT_PUBLIC_APP_URL=""
+2026-Feb-17 13:55:34.591208 [DEBUG] ARG NEXT_PUBLIC_SUPABASE_URL=""
+2026-Feb-17 13:55:34.591208 [DEBUG] ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=""
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] RUN npm run build
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] # ============================
+2026-Feb-17 13:55:34.591208 [DEBUG] # Stage 3: Production Runner
+2026-Feb-17 13:55:34.591208 [DEBUG] # ============================
+2026-Feb-17 13:55:34.591208 [DEBUG] FROM node:20-alpine AS runner
+2026-Feb-17 13:55:34.591208 [DEBUG] WORKDIR /app
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] ENV NODE_ENV=production
+2026-Feb-17 13:55:34.591208 [DEBUG] ENV NEXT_TELEMETRY_DISABLED=1
+2026-Feb-17 13:55:34.591208 [DEBUG] ENV USE_FILE_STORE=true
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] # Install runtime deps
+2026-Feb-17 13:55:34.591208 [DEBUG] RUN apk add --no-cache libc6-compat curl
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] # Create non-root user
+2026-Feb-17 13:55:34.591208 [DEBUG] RUN addgroup --system --gid 1001 nodejs
+2026-Feb-17 13:55:34.591208 [DEBUG] RUN adduser --system --uid 1001 nextjs
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] # Copy built application
+2026-Feb-17 13:55:34.591208 [DEBUG] COPY --from=builder /app/public ./public
+2026-Feb-17 13:55:34.591208 [DEBUG] COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+2026-Feb-17 13:55:34.591208 [DEBUG] COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] # Create sessions directory with proper permissions
+2026-Feb-17 13:55:34.591208 [DEBUG] # This will be mounted as a persistent volume in Coolify
+2026-Feb-17 13:55:34.591208 [DEBUG] RUN mkdir -p /app/sessions && chown -R nextjs:nodejs /app/sessions
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] # Create store directory for file-based message store
+2026-Feb-17 13:55:34.591208 [DEBUG] RUN mkdir -p /app/store && chown -R nextjs:nodejs /app/store
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] USER nextjs
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] EXPOSE 3000
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] ENV PORT=3000
+2026-Feb-17 13:55:34.591208 [DEBUG] ENV HOSTNAME="0.0.0.0"
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] # Healthcheck for Coolify
+2026-Feb-17 13:55:34.591208 [DEBUG] HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+2026-Feb-17 13:55:34.591208 [DEBUG] CMD curl -f http://localhost:3000/api/wa/status || exit 1
+2026-Feb-17 13:55:34.591208 [DEBUG] 
+2026-Feb-17 13:55:34.591208 [DEBUG] CMD ["node", "server.js"]
+2026-Feb-17 13:55:34.658376 [DEBUG] Final Dockerfile:
+2026-Feb-17 13:55:35.098255 [DEBUG] [CMD]: docker exec gcg0w4sg4sw0g044gc8o80s8 bash -c 'cat /artifacts/gcg0w4sg4sw0g044gc8o80s8/Dockerfile'
+2026-Feb-17 13:55:35.098255 [DEBUG] # ============================
+2026-Feb-17 13:55:35.098255 [DEBUG] # Stage 1: Dependencies
+2026-Feb-17 13:55:35.098255 [DEBUG] # ============================
+2026-Feb-17 13:55:35.098255 [DEBUG] FROM node:20-alpine AS deps
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG DATABASE_URL=postgresql://postgres:<REDACTED>:5432/postgres?pgbouncer=true
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG DIRECT_URL=postgresql://postgres:<REDACTED>:5432/postgres
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG USE_FILE_STORE=true
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG GOOGLE_CLIENT_ID=233657540217-ee7bgbraui5plh9l7pb0mtm197chcbna.apps.googleusercontent.com
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG GOOGLE_CLIENT_SECRET=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
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG GOOGLE_REDIRECT_URI=https://whatsaapp.cyberroad.cloud/contacts/google-sync/callback
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG NEXT_PUBLIC_SUPABASE_URL=https://yixrxvswsfiseslinpdv.supabase.co
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_m9FHKtfHcx20OMWRrc9Irg_X3F7kt0a
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAACdNoFqQNKvTL_7L
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG TURNSTILE_SECRET_KEY=<REDACTED>
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpeHJ4dnN3c2Zpc2VzbGlucGR2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTE2MDM5NSwiZXhwIjoyMDg2NzM2Mzk1fQ.N2ZoBUJdpaNDlGqozf9ryYavj2X5xtyOcR_zH_iaHmc
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG NEXT_PUBLIC_APP_URL=https://whatsaapp.cyberroad.cloud
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG COOLIFY_URL=http://rsko0gwscsk4cg8s8ksgg8w8.62.169.26.135.sslip.io
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG COOLIFY_FQDN=rsko0gwscsk4cg8s8ksgg8w8.62.169.26.135.sslip.io
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG COOLIFY_BRANCH=main
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG COOLIFY_RESOURCE_UUID=rsko0gwscsk4cg8s8ksgg8w8
+2026-Feb-17 13:55:35.098255 [DEBUG] WORKDIR /app
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] # Install dependencies needed for native modules
+2026-Feb-17 13:55:35.098255 [DEBUG] RUN apk add --no-cache libc6-compat python3 make g++
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] COPY package.json package-lock.json* ./
+2026-Feb-17 13:55:35.098255 [DEBUG] RUN npm ci --production=false
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] # ============================
+2026-Feb-17 13:55:35.098255 [DEBUG] # Stage 2: Build
+2026-Feb-17 13:55:35.098255 [DEBUG] # ============================
+2026-Feb-17 13:55:35.098255 [DEBUG] FROM node:20-alpine AS builder
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG DATABASE_URL=postgresql://postgres:<REDACTED>:5432/postgres?pgbouncer=true
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG DIRECT_URL=postgresql://postgres:<REDACTED>:5432/postgres
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG USE_FILE_STORE=true
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG GOOGLE_CLIENT_ID=233657540217-ee7bgbraui5plh9l7pb0mtm197chcbna.apps.googleusercontent.com
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG GOOGLE_CLIENT_SECRET=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
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG GOOGLE_REDIRECT_URI=https://whatsaapp.cyberroad.cloud/contacts/google-sync/callback
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG NEXT_PUBLIC_SUPABASE_URL=https://yixrxvswsfiseslinpdv.supabase.co
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_m9FHKtfHcx20OMWRrc9Irg_X3F7kt0a
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAACdNoFqQNKvTL_7L
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG TURNSTILE_SECRET_KEY=<REDACTED>
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpeHJ4dnN3c2Zpc2VzbGlucGR2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTE2MDM5NSwiZXhwIjoyMDg2NzM2Mzk1fQ.N2ZoBUJdpaNDlGqozf9ryYavj2X5xtyOcR_zH_iaHmc
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG NEXT_PUBLIC_APP_URL=https://whatsaapp.cyberroad.cloud
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG COOLIFY_URL=http://rsko0gwscsk4cg8s8ksgg8w8.62.169.26.135.sslip.io
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG COOLIFY_FQDN=rsko0gwscsk4cg8s8ksgg8w8.62.169.26.135.sslip.io
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG COOLIFY_BRANCH=main
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG COOLIFY_RESOURCE_UUID=rsko0gwscsk4cg8s8ksgg8w8
+2026-Feb-17 13:55:35.098255 [DEBUG] WORKDIR /app
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] COPY --from=deps /app/node_modules ./node_modules
+2026-Feb-17 13:55:35.098255 [DEBUG] COPY . .
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] # Disable Next.js telemetry during build
+2026-Feb-17 13:55:35.098255 [DEBUG] ENV NEXT_TELEMETRY_DISABLED=1
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] # Need dummy env vars for build (Next.js validates at build time)
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG NEXT_PUBLIC_APP_URL=""
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG NEXT_PUBLIC_SUPABASE_URL=""
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=""
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] RUN npm run build
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] # ============================
+2026-Feb-17 13:55:35.098255 [DEBUG] # Stage 3: Production Runner
+2026-Feb-17 13:55:35.098255 [DEBUG] # ============================
+2026-Feb-17 13:55:35.098255 [DEBUG] FROM node:20-alpine AS runner
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG DATABASE_URL=postgresql://postgres:<REDACTED>:5432/postgres?pgbouncer=true
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG DIRECT_URL=postgresql://postgres:<REDACTED>:5432/postgres
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG USE_FILE_STORE=true
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG GOOGLE_CLIENT_ID=233657540217-ee7bgbraui5plh9l7pb0mtm197chcbna.apps.googleusercontent.com
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG GOOGLE_CLIENT_SECRET=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
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG GOOGLE_REDIRECT_URI=https://whatsaapp.cyberroad.cloud/contacts/google-sync/callback
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG NEXT_PUBLIC_SUPABASE_URL=https://yixrxvswsfiseslinpdv.supabase.co
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_m9FHKtfHcx20OMWRrc9Irg_X3F7kt0a
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAACdNoFqQNKvTL_7L
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG TURNSTILE_SECRET_KEY=<REDACTED>
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpeHJ4dnN3c2Zpc2VzbGlucGR2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTE2MDM5NSwiZXhwIjoyMDg2NzM2Mzk1fQ.N2ZoBUJdpaNDlGqozf9ryYavj2X5xtyOcR_zH_iaHmc
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG NEXT_PUBLIC_APP_URL=https://whatsaapp.cyberroad.cloud
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG COOLIFY_URL=http://rsko0gwscsk4cg8s8ksgg8w8.62.169.26.135.sslip.io
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG COOLIFY_FQDN=rsko0gwscsk4cg8s8ksgg8w8.62.169.26.135.sslip.io
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG COOLIFY_BRANCH=main
+2026-Feb-17 13:55:35.098255 [DEBUG] ARG COOLIFY_RESOURCE_UUID=rsko0gwscsk4cg8s8ksgg8w8
+2026-Feb-17 13:55:35.098255 [DEBUG] WORKDIR /app
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] ENV NODE_ENV=production
+2026-Feb-17 13:55:35.098255 [DEBUG] ENV NEXT_TELEMETRY_DISABLED=1
+2026-Feb-17 13:55:35.098255 [DEBUG] ENV USE_FILE_STORE=true
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] # Install runtime deps
+2026-Feb-17 13:55:35.098255 [DEBUG] RUN apk add --no-cache libc6-compat curl
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] # Create non-root user
+2026-Feb-17 13:55:35.098255 [DEBUG] RUN addgroup --system --gid 1001 nodejs
+2026-Feb-17 13:55:35.098255 [DEBUG] RUN adduser --system --uid 1001 nextjs
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] # Copy built application
+2026-Feb-17 13:55:35.098255 [DEBUG] COPY --from=builder /app/public ./public
+2026-Feb-17 13:55:35.098255 [DEBUG] COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+2026-Feb-17 13:55:35.098255 [DEBUG] COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] # Create sessions directory with proper permissions
+2026-Feb-17 13:55:35.098255 [DEBUG] # This will be mounted as a persistent volume in Coolify
+2026-Feb-17 13:55:35.098255 [DEBUG] RUN mkdir -p /app/sessions && chown -R nextjs:nodejs /app/sessions
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] # Create store directory for file-based message store
+2026-Feb-17 13:55:35.098255 [DEBUG] RUN mkdir -p /app/store && chown -R nextjs:nodejs /app/store
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] USER nextjs
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] EXPOSE 3000
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] ENV PORT=3000
+2026-Feb-17 13:55:35.098255 [DEBUG] ENV HOSTNAME="0.0.0.0"
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] # Healthcheck for Coolify
+2026-Feb-17 13:55:35.098255 [DEBUG] HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+2026-Feb-17 13:55:35.098255 [DEBUG] CMD curl -f http://localhost:3000/api/wa/status || exit 1
+2026-Feb-17 13:55:35.098255 [DEBUG] 
+2026-Feb-17 13:55:35.098255 [DEBUG] CMD ["node", "server.js"]
+2026-Feb-17 13:55:35.108302 ----------------------------------------
+2026-Feb-17 13:55:35.121789 Building docker image started.
+2026-Feb-17 13:55:35.136570 To check the current progress, click on Show Debug Logs.
+2026-Feb-17 13:55:35.564680 [DEBUG] [CMD]: docker exec gcg0w4sg4sw0g044gc8o80s8 bash -c 'cat /artifacts/build.sh'
+2026-Feb-17 13:55:35.564680 [DEBUG] cd /artifacts/gcg0w4sg4sw0g044gc8o80s8 && set -a && source /artifacts/build-time.env && set +a && docker build  --add-host coolify:10.0.1.5 --add-host coolify-db:10.0.1.2 --add-host coolify-realtime:10.0.1.4 --add-host coolify-redis:10.0.1.3 --add-host mwoo0oc4o8oww8gw448ckk0k:10.0.1.6 --network host -f /artifacts/gcg0w4sg4sw0g044gc8o80s8/Dockerfile --build-arg COOLIFY_URL --build-arg COOLIFY_FQDN --build-arg COOLIFY_BRANCH --build-arg COOLIFY_RESOURCE_UUID --build-arg DATABASE_URL --build-arg DIRECT_URL --build-arg USE_FILE_STORE --build-arg GOOGLE_CLIENT_ID --build-arg GOOGLE_CLIENT_SECRET --build-arg GOOGLE_REDIRECT_URI --build-arg NEXT_PUBLIC_SUPABASE_URL --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY --build-arg TURNSTILE_SECRET_KEY --build-arg SUPABASE_SERVICE_ROLE_KEY --build-arg NEXT_PUBLIC_APP_URL --build-arg COOLIFY_BUILD_SECRETS_HASH=3234eeacb3b77290cdb3072ba1f56f3e8b28647ffd0a542d3e6a7a9d663e1560 --build-arg 'COOLIFY_URL' --build-arg 'COOLIFY_FQDN' --build-arg 'COOLIFY_BRANCH' --build-arg 'COOLIFY_RESOURCE_UUID' --progress plain -t rsko0gwscsk4cg8s8ksgg8w8:93157206e33022422f8c54dce7697528e3bb52af /artifacts/gcg0w4sg4sw0g044gc8o80s8
+2026-Feb-17 13:55:36.235524 [DEBUG] [CMD]: docker exec gcg0w4sg4sw0g044gc8o80s8 bash -c 'bash /artifacts/build.sh'
+2026-Feb-17 13:55:36.235524 [DEBUG] #0 building with "default" instance using docker driver
+2026-Feb-17 13:55:36.235524 [DEBUG] 
+2026-Feb-17 13:55:36.235524 [DEBUG] #1 [internal] load build definition from Dockerfile
+2026-Feb-17 13:55:36.235524 [DEBUG] #1 transferring dockerfile: 5.76kB done
+2026-Feb-17 13:55:36.235524 [DEBUG] #1 DONE 0.0s
+2026-Feb-17 13:55:36.235524 [DEBUG] 
+2026-Feb-17 13:55:36.235524 [DEBUG] #2 [internal] load metadata for docker.io/library/node:20-alpine
+2026-Feb-17 13:55:37.299365 [DEBUG] #2 DONE 1.2s
+2026-Feb-17 13:55:37.399595 [DEBUG] #3 [internal] load .dockerignore
+2026-Feb-17 13:55:37.406278 [DEBUG] #3 transferring context: 147B done
+2026-Feb-17 13:55:37.406278 [DEBUG] #3 DONE 0.0s
+2026-Feb-17 13:55:37.406278 [DEBUG] 
+2026-Feb-17 13:55:37.406278 [DEBUG] #4 [deps 1/5] FROM docker.io/library/node:20-alpine@sha256:09e2b3d9726018aecf269bd35325f46bf75046a643a66d28360ec71132750ec8
+2026-Feb-17 13:55:37.406278 [DEBUG] #4 resolve docker.io/library/node:20-alpine@sha256:09e2b3d9726018aecf269bd35325f46bf75046a643a66d28360ec71132750ec8 0.0s done
+2026-Feb-17 13:55:37.638073 [DEBUG] #4 ...
+2026-Feb-17 13:55:37.638073 [DEBUG] 
+2026-Feb-17 13:55:37.638073 [DEBUG] #5 [internal] load build context
+2026-Feb-17 13:55:37.638073 [DEBUG] #5 transferring context: 626.62kB 0.0s done
+2026-Feb-17 13:55:37.638073 [DEBUG] #5 DONE 0.1s
+2026-Feb-17 13:55:37.638073 [DEBUG] 
+2026-Feb-17 13:55:37.638073 [DEBUG] #4 [deps 1/5] FROM docker.io/library/node:20-alpine@sha256:09e2b3d9726018aecf269bd35325f46bf75046a643a66d28360ec71132750ec8
+2026-Feb-17 13:55:37.650838 [DEBUG] #4 sha256:e31b2016552274339ed88ed4a438d78bf37e0f6bdf328d02207b2a598c1ef86d 0B / 445B 0.2s
+2026-Feb-17 13:55:37.757112 [DEBUG] #4 sha256:e31b2016552274339ed88ed4a438d78bf37e0f6bdf328d02207b2a598c1ef86d 445B / 445B 0.3s done
+2026-Feb-17 13:55:37.757112 [DEBUG] #4 sha256:eb87f4721c91769ed5206f34a9ab6ec98fc1d5235c12c2fc956665b1155e9ecb 0B / 1.26MB 0.2s
+2026-Feb-17 13:55:37.757112 [DEBUG] #4 sha256:ad6d96c196e3198e14ea37df8bba4f54bf92fb525eb65e49fa4027c7dee13f80 0B / 42.78MB 0.2s
+2026-Feb-17 13:55:38.118840 [DEBUG] #4 sha256:eb87f4721c91769ed5206f34a9ab6ec98fc1d5235c12c2fc956665b1155e9ecb 1.05MB / 1.26MB 0.6s
+2026-Feb-17 13:55:38.271012 [DEBUG] #4 sha256:eb87f4721c91769ed5206f34a9ab6ec98fc1d5235c12c2fc956665b1155e9ecb 1.26MB / 1.26MB 0.6s done
+2026-Feb-17 13:55:38.271012 [DEBUG] #4 sha256:ad6d96c196e3198e14ea37df8bba4f54bf92fb525eb65e49fa4027c7dee13f80 5.24MB / 42.78MB 0.8s
+2026-Feb-17 13:55:38.419184 [DEBUG] #4 sha256:ad6d96c196e3198e14ea37df8bba4f54bf92fb525eb65e49fa4027c7dee13f80 9.44MB / 42.78MB 0.9s
+2026-Feb-17 13:55:38.569613 [DEBUG] #4 sha256:ad6d96c196e3198e14ea37df8bba4f54bf92fb525eb65e49fa4027c7dee13f80 12.58MB / 42.78MB 1.1s
+2026-Feb-17 13:55:38.722138 [DEBUG] #4 sha256:ad6d96c196e3198e14ea37df8bba4f54bf92fb525eb65e49fa4027c7dee13f80 16.78MB / 42.78MB 1.2s
+2026-Feb-17 13:55:38.872432 [DEBUG] #4 sha256:ad6d96c196e3198e14ea37df8bba4f54bf92fb525eb65e49fa4027c7dee13f80 19.92MB / 42.78MB 1.4s
+2026-Feb-17 13:55:39.020449 [DEBUG] #4 sha256:ad6d96c196e3198e14ea37df8bba4f54bf92fb525eb65e49fa4027c7dee13f80 24.12MB / 42.78MB 1.5s
+2026-Feb-17 13:55:39.170803 [DEBUG] #4 sha256:ad6d96c196e3198e14ea37df8bba4f54bf92fb525eb65e49fa4027c7dee13f80 27.26MB / 42.78MB 1.7s
+2026-Feb-17 13:55:39.319183 [DEBUG] #4 sha256:ad6d96c196e3198e14ea37df8bba4f54bf92fb525eb65e49fa4027c7dee13f80 31.46MB / 42.78MB 1.8s
+2026-Feb-17 13:55:39.469879 [DEBUG] #4 sha256:ad6d96c196e3198e14ea37df8bba4f54bf92fb525eb65e49fa4027c7dee13f80 34.60MB / 42.78MB 2.0s
+2026-Feb-17 13:55:39.619162 [DEBUG] #4 sha256:ad6d96c196e3198e14ea37df8bba4f54bf92fb525eb65e49fa4027c7dee13f80 38.80MB / 42.78MB 2.1s
+2026-Feb-17 13:55:39.770019 [DEBUG] #4 sha256:ad6d96c196e3198e14ea37df8bba4f54bf92fb525eb65e49fa4027c7dee13f80 42.21MB / 42.78MB 2.3s
+2026-Feb-17 13:55:39.950427 [DEBUG] #4 sha256:ad6d96c196e3198e14ea37df8bba4f54bf92fb525eb65e49fa4027c7dee13f80 42.78MB / 42.78MB 2.3s done
+2026-Feb-17 13:55:39.950427 [DEBUG] #4 extracting sha256:ad6d96c196e3198e14ea37df8bba4f54bf92fb525eb65e49fa4027c7dee13f80
+2026-Feb-17 13:55:40.969499 [DEBUG] #4 extracting sha256:ad6d96c196e3198e14ea37df8bba4f54bf92fb525eb65e49fa4027c7dee13f80 1.2s done
+2026-Feb-17 13:55:40.969499 [DEBUG] #4 DONE 3.6s
+2026-Feb-17 13:55:41.070716 [DEBUG] #4 [deps 1/5] FROM docker.io/library/node:20-alpine@sha256:09e2b3d9726018aecf269bd35325f46bf75046a643a66d28360ec71132750ec8
+2026-Feb-17 13:55:41.070716 [DEBUG] #4 extracting sha256:eb87f4721c91769ed5206f34a9ab6ec98fc1d5235c12c2fc956665b1155e9ecb 0.1s done
+2026-Feb-17 13:55:41.070716 [DEBUG] #4 extracting sha256:e31b2016552274339ed88ed4a438d78bf37e0f6bdf328d02207b2a598c1ef86d 0.0s done
+2026-Feb-17 13:55:41.070716 [DEBUG] #4 DONE 3.7s
+2026-Feb-17 13:55:41.070716 [DEBUG] 
+2026-Feb-17 13:55:41.070716 [DEBUG] #6 [deps 2/5] WORKDIR /app
+2026-Feb-17 13:55:41.190199 [DEBUG] #6 DONE 0.1s
+2026-Feb-17 13:55:41.344271 [DEBUG] #7 [deps 3/5] RUN apk add --no-cache libc6-compat python3 make g++
+2026-Feb-17 13:55:42.099607 [DEBUG] #7 0.823 ( 1/32) Installing libstdc++-dev (15.2.0-r2)
+2026-Feb-17 13:55:42.333623 [DEBUG] #7 1.105 ( 2/32) Installing jansson (2.14.1-r0)
+2026-Feb-17 13:55:42.333623 [DEBUG] #7 1.112 ( 3/32) Installing zstd-libs (1.5.7-r2)
+2026-Feb-17 13:55:42.333623 [DEBUG] #7 1.135 ( 4/32) Installing binutils (2.45.1-r0)
+2026-Feb-17 13:55:42.490193 [DEBUG] #7 ...
+2026-Feb-17 13:55:42.490193 [DEBUG] 
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 [runner  3/10] RUN apk add --no-cache libc6-compat curl
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 0.804 ( 1/13) Installing brotli-libs (1.2.0-r0)
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 0.831 ( 2/13) Installing c-ares (1.34.6-r0)
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 0.846 ( 3/13) Installing libunistring (1.4.1-r0)
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 0.905 ( 4/13) Installing libidn2 (2.3.8-r0)
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 0.920 ( 5/13) Installing nghttp2-libs (1.68.0-r0)
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 0.931 ( 6/13) Installing nghttp3 (1.13.1-r0)
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 0.941 ( 7/13) Installing libpsl (0.21.5-r3)
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 0.950 ( 8/13) Installing zstd-libs (1.5.7-r2)
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 0.971 ( 9/13) Installing libcurl (8.17.0-r1)
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 1.013 (10/13) Installing curl (8.17.0-r1)
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 1.033 (11/13) Installing musl-obstack (1.2.3-r2)
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 1.040 (12/13) Installing libucontext (1.3.3-r0)
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 1.049 (13/13) Installing gcompat (1.1.0-r4)
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 1.060 Executing busybox-1.37.0-r30.trigger
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 1.077 OK: 16.2 MiB in 31 packages
+2026-Feb-17 13:55:42.490193 [DEBUG] #8 DONE 1.2s
+2026-Feb-17 13:55:42.490193 [DEBUG] 
+2026-Feb-17 13:55:42.490193 [DEBUG] #7 [deps 3/5] RUN apk add --no-cache libc6-compat python3 make g++
+2026-Feb-17 13:55:42.490193 [DEBUG] #7 1.298 ( 5/32) Installing libgomp (15.2.0-r2)
+2026-Feb-17 13:55:42.593624 [DEBUG] #7 ...
+2026-Feb-17 13:55:42.593624 [DEBUG] 
+2026-Feb-17 13:55:42.593624 [DEBUG] #9 [runner  4/10] RUN addgroup --system --gid 1001 nodejs
+2026-Feb-17 13:55:42.593624 [DEBUG] #9 DONE 0.1s
+2026-Feb-17 13:55:42.593624 [DEBUG] 
+2026-Feb-17 13:55:42.593624 [DEBUG] #7 [deps 3/5] RUN apk add --no-cache libc6-compat python3 make g++
+2026-Feb-17 13:55:42.593624 [DEBUG] #7 1.311 ( 6/32) Installing libatomic (15.2.0-r2)
+2026-Feb-17 13:55:42.593624 [DEBUG] #7 1.316 ( 7/32) Installing gmp (6.3.0-r4)
+2026-Feb-17 13:55:42.593624 [DEBUG] #7 1.330 ( 8/32) Installing isl26 (0.26-r1)
+2026-Feb-17 13:55:42.593624 [DEBUG] #7 1.374 ( 9/32) Installing mpfr4 (4.2.2-r0)
+2026-Feb-17 13:55:42.593624 [DEBUG] #7 1.393 (10/32) Installing mpc1 (1.3.1-r1)
+2026-Feb-17 13:55:42.593624 [DEBUG] #7 1.401 (11/32) Installing gcc (15.2.0-r2)
+2026-Feb-17 13:55:42.775300 [DEBUG] #7 ...
+2026-Feb-17 13:55:42.775300 [DEBUG] 
+2026-Feb-17 13:55:42.775300 [DEBUG] #10 [runner  5/10] RUN adduser --system --uid 1001 nextjs
+2026-Feb-17 13:55:42.775300 [DEBUG] #10 DONE 0.1s
+2026-Feb-17 13:55:42.924146 [DEBUG] #7 [deps 3/5] RUN apk add --no-cache libc6-compat python3 make g++
+2026-Feb-17 13:55:45.179083 [DEBUG] #7 3.986 (12/32) Installing musl-dev (1.2.5-r21)
+2026-Feb-17 13:55:45.349382 [DEBUG] #7 4.157 (13/32) Installing g++ (15.2.0-r2)
+2026-Feb-17 13:55:46.182697 [DEBUG] #7 4.991 (14/32) Installing musl-obstack (1.2.3-r2)
+2026-Feb-17 13:55:46.283680 [DEBUG] #7 5.012 (15/32) Installing libucontext (1.3.3-r0)
+2026-Feb-17 13:55:46.283680 [DEBUG] #7 5.017 (16/32) Installing gcompat (1.1.0-r4)
+2026-Feb-17 13:55:46.283680 [DEBUG] #7 5.026 (17/32) Installing make (4.4.1-r3)
+2026-Feb-17 13:55:46.283680 [DEBUG] #7 5.042 (18/32) Installing libbz2 (1.0.8-r6)
+2026-Feb-17 13:55:46.283680 [DEBUG] #7 5.051 (19/32) Installing libexpat (2.7.4-r0)
+2026-Feb-17 13:55:46.283680 [DEBUG] #7 5.060 (20/32) Installing libffi (3.5.2-r0)
+2026-Feb-17 13:55:46.283680 [DEBUG] #7 5.071 (21/32) Installing gdbm (1.26-r0)
+2026-Feb-17 13:55:46.283680 [DEBUG] #7 5.080 (22/32) Installing xz-libs (5.8.2-r0)
+2026-Feb-17 13:55:46.283680 [DEBUG] #7 5.091 (23/32) Installing mpdecimal (4.0.1-r0)
+2026-Feb-17 13:55:46.405596 [DEBUG] #7 5.115 (24/32) Installing ncurses-terminfo-base (6.5_p20251123-r0)
+2026-Feb-17 13:55:46.405596 [DEBUG] #7 5.127 (25/32) Installing libncursesw (6.5_p20251123-r0)
+2026-Feb-17 13:55:46.405596 [DEBUG] #7 5.145 (26/32) Installing libpanelw (6.5_p20251123-r0)
+2026-Feb-17 13:55:46.405596 [DEBUG] #7 5.150 (27/32) Installing readline (8.3.1-r0)
+2026-Feb-17 13:55:46.405596 [DEBUG] #7 5.166 (28/32) Installing sqlite-libs (3.51.2-r0)
+2026-Feb-17 13:55:46.405596 [DEBUG] #7 5.214 (29/32) Installing python3 (3.12.12-r0)
+2026-Feb-17 13:55:46.777046 [DEBUG] #7 5.585 (30/32) Installing python3-pycache-pyc0 (3.12.12-r0)
+2026-Feb-17 13:55:46.970337 [DEBUG] #7 5.777 (31/32) Installing pyc (3.12.12-r0)
+2026-Feb-17 13:55:46.970337 [DEBUG] #7 5.777 (32/32) Installing python3-pyc (3.12.12-r0)
+2026-Feb-17 13:55:46.970337 [DEBUG] #7 5.777 Executing busybox-1.37.0-r30.trigger
+2026-Feb-17 13:55:47.135335 [DEBUG] #7 5.792 OK: 301.3 MiB in 50 packages
+2026-Feb-17 13:55:47.194571 [DEBUG] #7 DONE 6.0s
+2026-Feb-17 13:55:47.443052 [DEBUG] #11 [deps 4/5] COPY package.json package-lock.json* ./
+2026-Feb-17 13:55:47.443052 [DEBUG] #11 DONE 0.1s
+2026-Feb-17 13:55:47.443052 [DEBUG] 
+2026-Feb-17 13:55:47.443052 [DEBUG] #12 [deps 5/5] RUN npm ci --production=false
+2026-Feb-17 13:55:47.530795 [DEBUG] #12 0.239 npm warn config production Use `--omit=dev` instead.
+2026-Feb-17 13:55:54.646118 [DEBUG] #12 7.345 npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+2026-Feb-17 13:55:54.943182 [DEBUG] #12 7.651 npm warn deprecated @types/uuid@11.0.0: This is a stub types definition. uuid provides its own type definitions, so you do not need this installed.
+2026-Feb-17 13:55:56.980036 [DEBUG] #12 9.688 npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting <REDACTED>
+2026-Feb-17 13:56:16.130636 [DEBUG] #12 28.84
+2026-Feb-17 13:56:16.130636 [DEBUG] #12 28.84 added 562 packages, and audited 563 packages in 29s
+2026-Feb-17 13:56:16.130636 [DEBUG] #12 28.84
+2026-Feb-17 13:56:16.130636 [DEBUG] #12 28.84 175 packages are looking for funding
+2026-Feb-17 13:56:16.130636 [DEBUG] #12 28.84   run `npm fund` for details
+2026-Feb-17 13:56:16.286424 [DEBUG] #12 28.84
+2026-Feb-17 13:56:16.286424 [DEBUG] #12 28.84 found 0 vulnerabilities
+2026-Feb-17 13:56:16.286424 [DEBUG] #12 28.84 npm notice
+2026-Feb-17 13:56:16.286424 [DEBUG] #12 28.84 npm notice New major version of npm available! 10.8.2 -> 11.10.0
+2026-Feb-17 13:56:16.286424 [DEBUG] #12 28.84 npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.10.0
+2026-Feb-17 13:56:16.286424 [DEBUG] #12 28.84 npm notice To update run: npm install -g npm@11.10.0
+2026-Feb-17 13:56:16.286424 [DEBUG] #12 28.84 npm notice
+2026-Feb-17 13:56:16.704534 [DEBUG] #12 DONE 29.4s
+2026-Feb-17 13:56:20.135772 [DEBUG] #13 [builder 3/5] COPY --from=deps /app/node_modules ./node_modules
+2026-Feb-17 13:56:25.976548 [DEBUG] #13 DONE 5.8s
+2026-Feb-17 13:56:26.133187 [DEBUG] #14 [builder 4/5] COPY . .
+2026-Feb-17 13:56:26.271156 [DEBUG] #14 DONE 0.3s
+2026-Feb-17 13:56:26.426808 [DEBUG] #15 [builder 5/5] RUN npm run build
+2026-Feb-17 13:56:26.903919 [DEBUG] #15 0.628
+2026-Feb-17 13:56:26.903919 [DEBUG] #15 0.628 > whatsapp-grup@0.1.0 build
+2026-Feb-17 13:56:26.903919 [DEBUG] #15 0.628 > next build
+2026-Feb-17 13:56:26.903919 [DEBUG] #15 0.628
+2026-Feb-17 13:56:28.449539 [DEBUG] #15 2.174 ▲ Next.js 16.1.6 (Turbopack)
+2026-Feb-17 13:56:28.666617 [DEBUG] #15 2.175
+2026-Feb-17 13:56:28.666617 [DEBUG] #15 2.180 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+2026-Feb-17 13:56:28.666617 [DEBUG] #15 2.240   Creating an optimized production build ...
+2026-Feb-17 13:56:48.499849 [DEBUG] #15 22.21 ✓ Compiled successfully in 19.0s
+2026-Feb-17 13:56:48.652533 [DEBUG] #15 22.22   Running TypeScript ...
+2026-Feb-17 13:57:24.828223 [DEBUG] #15 58.55   Collecting page data using 3 workers ...
+2026-Feb-17 13:57:26.433251 [DEBUG] #15 60.15 [WAManager] 🟢 Creating new WAClientManager instance (Singleton)
+2026-Feb-17 13:57:26.581401 [DEBUG] #15 60.16 [WAManager] 🟢 Creating new WAClientManager instance (Singleton)
+2026-Feb-17 13:57:27.430985 [DEBUG] #15 61.16 [WAManager] Auto-reconnect started (Lazy loading strategy for Redis)
+2026-Feb-17 13:57:27.584611 [DEBUG] #15 61.16 [WAManager] Auto-reconnect started (Lazy loading strategy for Redis)
+2026-Feb-17 13:57:28.150318 [DEBUG] #15 61.88   Generating static pages using 3 workers (0/21) ...
+2026-Feb-17 13:57:29.695777 [DEBUG] #15 63.42   Generating static pages using 3 workers (5/21)
+2026-Feb-17 13:57:29.961025 [DEBUG] #15 63.68   Generating static pages using 3 workers (10/21)
+2026-Feb-17 13:57:30.207751 [DEBUG] #15 63.93   Generating static pages using 3 workers (15/21)
+2026-Feb-17 13:57:30.380853 [DEBUG] #15 64.10 ✓ Generating static pages using 3 workers (21/21) in 2.2s
+2026-Feb-17 13:57:30.549307 [DEBUG] #15 64.12   Finalizing page optimization ...
+2026-Feb-17 13:57:31.355832 [DEBUG] #15 65.08
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 Route (app)
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ┌ ○ /
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ○ /_not-found
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ƒ /api/auth/login
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ƒ /api/auth/logout
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ƒ /api/broadcast
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ƒ /api/contacts/google-sync
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ƒ /api/contacts/vcf
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ƒ /api/groups
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ƒ /api/groups/create-bulk
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ƒ /api/jobs/status
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ƒ /api/wa/cancel
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ƒ /api/wa/connect
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ƒ /api/wa/disconnect
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ƒ /api/wa/qr
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ƒ /api/wa/reset
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ƒ /api/wa/status
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ƒ /api/wa/validate
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ○ /auth
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ○ /broadcast
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ○ /contacts
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ○ /contacts/google-sync
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ○ /contacts/validator
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ○ /groups
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ├ ○ /groups/create
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 └ ○ /login
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ƒ Proxy (Middleware)
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ○  (Static)   prerendered as static content
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09 ƒ  (Dynamic)  server-rendered on demand
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.09
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.22 npm notice
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.22 npm notice New major version of npm available! 10.8.2 -> 11.10.0
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.22 npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.10.0
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.22 npm notice To update run: npm install -g npm@11.10.0
+2026-Feb-17 13:57:31.500857 [DEBUG] #15 65.22 npm notice
+2026-Feb-17 13:57:31.620254 [DEBUG] #15 DONE 65.3s
+2026-Feb-17 13:57:33.511702 [DEBUG] #16 [runner  6/10] COPY --from=builder /app/public ./public
+2026-Feb-17 13:57:33.722659 [DEBUG] #16 DONE 0.1s
+2026-Feb-17 13:57:33.722659 [DEBUG] 
+2026-Feb-17 13:57:33.722659 [DEBUG] #17 [runner  7/10] COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+2026-Feb-17 13:57:34.649974 [DEBUG] #17 DONE 1.1s
+2026-Feb-17 13:57:34.781773 [DEBUG] #18 [runner  8/10] COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+2026-Feb-17 13:57:34.781773 [DEBUG] #18 DONE 0.1s
+2026-Feb-17 13:57:34.902786 [DEBUG] #19 [runner  9/10] RUN mkdir -p /app/sessions && chown -R nextjs:nodejs /app/sessions
+2026-Feb-17 13:57:34.902786 [DEBUG] #19 DONE 0.1s
+2026-Feb-17 13:57:35.038835 [DEBUG] #20 [runner 10/10] RUN mkdir -p /app/store && chown -R nextjs:nodejs /app/store
+2026-Feb-17 13:57:35.038835 [DEBUG] #20 DONE 0.1s
+2026-Feb-17 13:57:35.234083 [DEBUG] #21 exporting to image
+2026-Feb-17 13:57:35.234083 [DEBUG] #21 exporting layers
+2026-Feb-17 13:57:40.028503 [DEBUG] #21 exporting layers 5.0s done
+2026-Feb-17 13:57:40.124444 [DEBUG] #21 exporting manifest sha256:0702b286a7a4c65b5cc15476f1de0f743c0c1002ae6104e29ca258301df537f6 0.0s done
+2026-Feb-17 13:57:40.124444 [DEBUG] #21 exporting config sha256:005ed02d77b15f462fa4d30d19379a13d44cbf799838c732e91f57b6e7c51136 0.0s done
+2026-Feb-17 13:57:40.124444 [DEBUG] #21 exporting attestation manifest sha256:04fc771981f400759378391f9c2264ebf8c9a346bf4a986637e457bc6302b882 0.0s done
+2026-Feb-17 13:57:40.124444 [DEBUG] #21 exporting manifest list sha256:5f9b85ecb30ac291d3021a01bad12aa42a99a4c92b3826d3df12b5ff1ce0ed4e
+2026-Feb-17 13:57:40.299763 [DEBUG] #21 exporting manifest list sha256:5f9b85ecb30ac291d3021a01bad12aa42a99a4c92b3826d3df12b5ff1ce0ed4e 0.0s done
+2026-Feb-17 13:57:40.299763 [DEBUG] #21 naming to docker.io/library/rsko0gwscsk4cg8s8ksgg8w8:93157206e33022422f8c54dce7697528e3bb52af done
+2026-Feb-17 13:57:40.299763 [DEBUG] #21 unpacking to docker.io/library/rsko0gwscsk4cg8s8ksgg8w8:93157206e33022422f8c54dce7697528e3bb52af
+2026-Feb-17 13:57:41.722999 [DEBUG] #21 unpacking to docker.io/library/rsko0gwscsk4cg8s8ksgg8w8:93157206e33022422f8c54dce7697528e3bb52af 1.6s done
+2026-Feb-17 13:57:41.959440 [DEBUG] #21 DONE 6.7s
+2026-Feb-17 13:57:42.057720 [DEBUG] 9 warnings found (use docker --debug to expand):
+2026-Feb-17 13:57:42.057720 [DEBUG] - SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "GOOGLE_CLIENT_SECRET") (line 9)
+2026-Feb-17 13:57:42.057720 [DEBUG] - SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "SUPABASE_SERVICE_ROLE_KEY") (line 43)
+2026-Feb-17 13:57:42.057720 [DEBUG] - SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "GOOGLE_CLIENT_SECRET") (line 72)
+2026-Feb-17 13:57:42.057720 [DEBUG] - SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "TURNSTILE_SECRET_KEY") (line 77)
+2026-Feb-17 13:57:42.057720 [DEBUG] - SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "SUPABASE_SERVICE_ROLE_KEY") (line 78)
+2026-Feb-17 13:57:42.057720 [DEBUG] - SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "TURNSTILE_SECRET_KEY") (line 14)
+2026-Feb-17 13:57:42.057720 [DEBUG] - SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "SUPABASE_SERVICE_ROLE_KEY") (line 15)
+2026-Feb-17 13:57:42.057720 [DEBUG] - SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "GOOGLE_CLIENT_SECRET") (line 37)
+2026-Feb-17 13:57:42.057720 [DEBUG] - SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "TURNSTILE_SECRET_KEY") (line 42)
+2026-Feb-17 13:57:42.094479 Building docker image completed.
+2026-Feb-17 13:57:42.163679 [DEBUG] Creating .env file with runtime variables for container.
+2026-Feb-17 13:57:42.537572 ----------------------------------------
+2026-Feb-17 13:57:42.550804 Rolling update started.
+2026-Feb-17 13:57:43.696204 [DEBUG] [CMD]: docker exec gcg0w4sg4sw0g044gc8o80s8 bash -c 'COOLIFY_URL=http://rsko0gwscsk4cg8s8ksgg8w8.62.169.26.135.sslip.io COOLIFY_FQDN=rsko0gwscsk4cg8s8ksgg8w8.62.169.26.135.sslip.io COOLIFY_BRANCH=main COOLIFY_RESOURCE_UUID=rsko0gwscsk4cg8s8ksgg8w8  docker compose --project-name rsko0gwscsk4cg8s8ksgg8w8 --project-directory /artifacts/gcg0w4sg4sw0g044gc8o80s8 -f /artifacts/gcg0w4sg4sw0g044gc8o80s8/docker-compose.yaml up --build -d'
+2026-Feb-17 13:57:43.696204 [DEBUG] Container rsko0gwscsk4cg8s8ksgg8w8-135528447813  Creating
+2026-Feb-17 13:57:43.943879 [DEBUG] rsko0gwscsk4cg8s8ksgg8w8-135528447813 Your kernel does not support memory swappiness capabilities or the cgroup is not mounted. Memory swappiness discarded.
+2026-Feb-17 13:57:43.950606 [DEBUG] Container rsko0gwscsk4cg8s8ksgg8w8-135528447813  Created
+2026-Feb-17 13:57:43.958263 [DEBUG] Container rsko0gwscsk4cg8s8ksgg8w8-135528447813  Starting
+2026-Feb-17 13:57:44.151970 [DEBUG] Container rsko0gwscsk4cg8s8ksgg8w8-135528447813  Started
+2026-Feb-17 13:57:44.169099 New container started.
+2026-Feb-17 13:57:44.182556 Custom healthcheck found in Dockerfile.
+2026-Feb-17 13:57:44.193341 Waiting for healthcheck to pass on the new container.
+2026-Feb-17 13:57:44.203005 Waiting for the start period (40 seconds) before starting healthcheck.
+2026-Feb-17 13:58:24.440081 [DEBUG] [CMD]: docker inspect --format='{{json .State.Health.Status}}' rsko0gwscsk4cg8s8ksgg8w8-135528447813
+2026-Feb-17 13:58:24.440081 [DEBUG] "starting"
+2026-Feb-17 13:58:24.633621 [DEBUG] [CMD]: docker inspect --format='{{json .State.Health.Log}}' rsko0gwscsk4cg8s8ksgg8w8-135528447813
+2026-Feb-17 13:58:24.633621 [DEBUG] [{"Start":"2026-02-17T14:57:59.472810154+01:00","End":"2026-02-17T14:57:59.535577253+01:00","ExitCode":1,"Output":"  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\ncurl: (22) The requested URL returned error: 401\n"},{"Start":"2026-02-17T14:58:04.536284862+01:00","End":"2026-02-17T14:58:04.630779134+01:00","ExitCode":1,"Output":"  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\ncurl: (22) The requested URL returned error: 401\n"},{"Start":"2026-02-17T14:58:09.631973665+01:00","End":"2026-02-17T14:58:09.746434808+01:00","ExitCode":1,"Output":"  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\ncurl: (22) The requested URL returned error: 401\n"},{"Start":"2026-02-17T14:58:14.748684649+01:00","End":"2026-02-17T14:58:14.873837309+01:00","ExitCode":1,"Output":"  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\ncurl: (22) The requested URL returned error: 401\n"},{"Start":"2026-02-17T14:58:19.875887404+01:00","End":"2026-02-17T14:58:19.951673669+01:00","ExitCode":1,"Output":"  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\ncurl: (22) The requested URL returned error: 401\n"}]
+2026-Feb-17 13:58:24.642824 Attempt 1 of 3 | Healthcheck status: "starting"
+2026-Feb-17 13:58:24.662301 Healthcheck logs:   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+2026-Feb-17 13:58:24.662301 Dload  Upload   Total   Spent    Left  Speed
+2026-Feb-17 13:58:24.662301 0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0
+2026-Feb-17 13:58:24.662301 curl: (22) The requested URL returned error: 401
+2026-Feb-17 13:58:24.662301 | Return code: 1
+2026-Feb-17 13:58:54.835057 [DEBUG] [CMD]: docker inspect --format='{{json .State.Health.Status}}' rsko0gwscsk4cg8s8ksgg8w8-135528447813
+2026-Feb-17 13:58:54.835057 [DEBUG] "starting"
+2026-Feb-17 13:58:54.968470 [DEBUG] [CMD]: docker inspect --format='{{json .State.Health.Log}}' rsko0gwscsk4cg8s8ksgg8w8-135528447813
+2026-Feb-17 13:58:54.968470 [DEBUG] [{"Start":"2026-02-17T14:58:04.536284862+01:00","End":"2026-02-17T14:58:04.630779134+01:00","ExitCode":1,"Output":"  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\ncurl: (22) The requested URL returned error: 401\n"},{"Start":"2026-02-17T14:58:09.631973665+01:00","End":"2026-02-17T14:58:09.746434808+01:00","ExitCode":1,"Output":"  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\ncurl: (22) The requested URL returned error: 401\n"},{"Start":"2026-02-17T14:58:14.748684649+01:00","End":"2026-02-17T14:58:14.873837309+01:00","ExitCode":1,"Output":"  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\ncurl: (22) The requested URL returned error: 401\n"},{"Start":"2026-02-17T14:58:19.875887404+01:00","End":"2026-02-17T14:58:19.951673669+01:00","ExitCode":1,"Output":"  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\ncurl: (22) The requested URL returned error: 401\n"},{"Start":"2026-02-17T14:58:24.953523474+01:00","End":"2026-02-17T14:58:25.039116206+01:00","ExitCode":1,"Output":"  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\ncurl: (22) The requested URL returned error: 401\n"}]
+2026-Feb-17 13:58:54.975307 Attempt 2 of 3 | Healthcheck status: "starting"
+2026-Feb-17 13:58:54.987368 Healthcheck logs:   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+2026-Feb-17 13:58:54.987368 Dload  Upload   Total   Spent    Left  Speed
+2026-Feb-17 13:58:54.987368 0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0
+2026-Feb-17 13:58:54.987368 curl: (22) The requested URL returned error: 401
+2026-Feb-17 13:58:54.987368 | Return code: 1
+2026-Feb-17 13:59:25.163973 [DEBUG] [CMD]: docker inspect --format='{{json .State.Health.Status}}' rsko0gwscsk4cg8s8ksgg8w8-135528447813
+2026-Feb-17 13:59:25.163973 [DEBUG] "starting"
+2026-Feb-17 13:59:25.330305 [DEBUG] [CMD]: docker inspect --format='{{json .State.Health.Log}}' rsko0gwscsk4cg8s8ksgg8w8-135528447813
+2026-Feb-17 13:59:25.330305 [DEBUG] [{"Start":"2026-02-17T14:58:14.748684649+01:00","End":"2026-02-17T14:58:14.873837309+01:00","ExitCode":1,"Output":"  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\ncurl: (22) The requested URL returned error: 401\n"},{"Start":"2026-02-17T14:58:19.875887404+01:00","End":"2026-02-17T14:58:19.951673669+01:00","ExitCode":1,"Output":"  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\ncurl: (22) The requested URL returned error: 401\n"},{"Start":"2026-02-17T14:58:24.953523474+01:00","End":"2026-02-17T14:58:25.039116206+01:00","ExitCode":1,"Output":"  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\ncurl: (22) The requested URL returned error: 401\n"},{"Start":"2026-02-17T14:58:55.040756585+01:00","End":"2026-02-17T14:58:55.113906648+01:00","ExitCode":1,"Output":"  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\ncurl: (22) The requested URL returned error: 401\n"},{"Start":"2026-02-17T14:59:25.115001216+01:00","End":"2026-02-17T14:59:25.193121746+01:00","ExitCode":1,"Output":"  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\r  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0\ncurl: (22) The requested URL returned error: 401\n"}]
+2026-Feb-17 13:59:25.341229 Attempt 3 of 3 | Healthcheck status: "starting"
+2026-Feb-17 13:59:25.357419 Healthcheck logs:   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+2026-Feb-17 13:59:25.357419 Dload  Upload   Total   Spent    Left  Speed
+2026-Feb-17 13:59:25.357419 0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0
+2026-Feb-17 13:59:25.357419 curl: (22) The requested URL returned error: 401
+2026-Feb-17 13:59:25.357419 | Return code: 1
+2026-Feb-17 13:59:55.415364 ----------------------------------------
+2026-Feb-17 13:59:55.433699 Container logs:
+2026-Feb-17 13:59:55.627161 [CMD]: docker logs -n 100 rsko0gwscsk4cg8s8ksgg8w8-135528447813
+2026-Feb-17 13:59:55.627161 ▲ Next.js 16.1.6
+2026-Feb-17 13:59:55.627161 - Local:         http://localhost:3000
+2026-Feb-17 13:59:55.627161 - Network:       http://0.0.0.0:3000
+2026-Feb-17 13:59:55.627161 
+2026-Feb-17 13:59:55.627161 ✓ Starting...
+2026-Feb-17 13:59:55.627161 ✓ Ready in 178ms
+2026-Feb-17 13:59:55.627161 [WAManager] 🟢 Creating new WAClientManager instance (Singleton)
+2026-Feb-17 13:59:55.627161 [WAManager] Auto-reconnect started (Lazy loading strategy for Redis)
+2026-Feb-17 13:59:55.636761 ----------------------------------------
+2026-Feb-17 13:59:55.651732 Removing old containers.
+2026-Feb-17 13:59:55.663314 ----------------------------------------
+2026-Feb-17 13:59:55.673721 WARNING: Dockerfile or Docker Image based deployment detected. The healthcheck needs a curl or wget command to check the health of the application. Please make sure that it is available in the image or turn off healthcheck on Coolify's UI.
+2026-Feb-17 13:59:55.684158 ----------------------------------------
+2026-Feb-17 13:59:55.699078 New container is not healthy, rolling back to the old container.
+2026-Feb-17 13:59:56.246579 [DEBUG] [CMD]: docker stop -t 30 rsko0gwscsk4cg8s8ksgg8w8-135528447813
+2026-Feb-17 13:59:56.246579 [DEBUG] rsko0gwscsk4cg8s8ksgg8w8-135528447813
+2026-Feb-17 13:59:56.433669 [DEBUG] [CMD]: docker rm -f rsko0gwscsk4cg8s8ksgg8w8-135528447813
+2026-Feb-17 13:59:56.433669 [DEBUG] rsko0gwscsk4cg8s8ksgg8w8-135528447813
+2026-Feb-17 13:59:56.443615 Rolling update completed.
+2026-Feb-17 13:59:56.823176 Gracefully shutting down build container: gcg0w4sg4sw0g044gc8o80s8
+2026-Feb-17 13:59:57.195120 [DEBUG] [CMD]: docker stop -t 30 gcg0w4sg4sw0g044gc8o80s8
+2026-Feb-17 13:59:57.195120 [DEBUG] gcg0w4sg4sw0g044gc8o80s8
