@@ -124,3 +124,15 @@ export const clearRedisAuthState = async (keyPrefix: string) => {
         console.error('Redis clear error:', error);
     }
 };
+
+export const hasRedisSession = async (keyPrefix: string): Promise<boolean> => {
+    const redis = getRedisClient();
+    try {
+        const credsKey = `${keyPrefix}creds`;
+        const exists = await redis.exists(credsKey);
+        return exists === 1;
+    } catch (error) {
+        console.error('Redis check error:', error);
+        return false;
+    }
+};

@@ -27,7 +27,7 @@ export class WAClient extends EventEmitter {
     private isPairingMode = false;
     public readonly profileId: string;
     public readonly userId: string;
-    private sessionPrefix: string;
+    public readonly sessionPrefix: string;
     // Cache for groups
     public groupCache: Map<string, any> = new Map();
 
