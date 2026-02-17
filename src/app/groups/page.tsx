@@ -20,6 +20,7 @@ export default function GroupsPage() {
     const [showBulkEdit, setShowBulkEdit] = useState(false);
     const [showAddMembers, setShowAddMembers] = useState(false);
     const [membersInput, setMembersInput] = useState('');
+    const [addMemberDelay, setAddMemberDelay] = useState(5);
     const [profileId, setProfileId] = useState('1');
     const [connectedProfiles, setConnectedProfiles] = useState<Array<{ profileId: string; status: string; phoneNumber: string | null }>>([]);
 
@@ -100,33 +101,37 @@ export default function GroupsPage() {
             return;
         }
 
-        let success = 0;
-        let fail = 0;
+        let totalAdded = 0;
+        let totalFailed = 0;
+        const groupIds = Array.from(selectedGroups);
 
-        for (const groupId of selectedGroups) {
+        for (let g = 0; g < groupIds.length; g++) {
+            const groupId = groupIds[g];
+            setMessage(`⏳ Adding ${numbers.length} members to group ${g + 1}/${groupIds.length}... (delay: ${addMemberDelay}s per member)`);
             try {
                 const res = await fetch('/api/groups', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         groupId,
-                        action: 'addParticipants',
-                        data: { participants: numbers },
+                        action: 'bulkAddMembers',
+                        data: { participants: numbers, delay: addMemberDelay },
                         profileId,
                     }),
                 });
-                if (res.ok) success++;
-                else fail++;
+                const result = await res.json();
+                totalAdded += result.added || 0;
+                totalFailed += result.failed || 0;
             } catch {
-                fail++;
+                totalFailed += numbers.length;
             }
         }
 
-        setMessage(`✅ Added members to ${success} groups, ❌ Failed: ${fail}`);
+        setMessage(`✅ Done! Added: ${totalAdded}, Failed: ${totalFailed} across ${groupIds.length} group(s)`);
         setShowAddMembers(false);
         setMembersInput('');
         setLoading(false);
-        fetchGroups(); // Refresh to see updated counts
+        fetchGroups();
     };
 
     const bulkUpdateDescription = async () => {
@@ -266,11 +271,30 @@ export default function GroupsPage() {
                                 style={{ minHeight: '120px' }}
                             />
                         </div>
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                        <div className="form-group" style={{ marginTop: '12px' }}>
+                            <label className="form-label">⏱️ Delay Per Member: {addMemberDelay}s</label>
+                            <p className="text-sm text-secondary" style={{ marginBottom: '4px' }}>
+                                Delay antar member untuk menghindari ban WhatsApp (minimal 3 detik)
+                            </p>
+                            <input
+                                type="range"
+                                min={3}
+                                max={30}
+                                value={addMemberDelay}
+                                onChange={(e) => setAddMemberDelay(Number(e.target.value))}
+                                style={{ width: '100%', accentColor: 'var(--accent)' }}
+                            />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)' }}>
+                                <span>3s (Cepat ⚡)</span>
+                                <span>15s (Aman ✅)</span>
+                                <span>30s (Sangat Aman 🛡️)</span>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                             <button className="btn btn-primary btn-sm" onClick={bulkAddMembers} disabled={loading}>
-                                Add Members
+                                {loading ? '⏳ Adding...' : `Add Members (${addMemberDelay}s delay)`}
                             </button>
-                            <button className="btn btn-secondary btn-sm" onClick={() => setShowAddMembers(false)}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setShowAddMembers(false)} disabled={loading}>
                                 Cancel
                             </button>
                         </div>

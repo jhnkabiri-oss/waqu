@@ -146,13 +146,14 @@ export async function PUT(req: NextRequest) {
                 await sock.groupParticipantsUpdate(groupId, data.participants, 'demote');
                 break;
             case 'bulkAddMembers':
-                // Implement safe bulk add with delays
+                // Implement safe bulk add with configurable delays
                 if (Array.isArray(data.participants) && data.participants.length > 0) {
                     const participants = data.participants;
+                    const memberDelay = Math.max(3, Math.min(30, data.delay || 5)) * 1000; // 3-30s, default 5s
                     let addedCount = 0;
                     let failedCount = 0;
 
-                    console.log(`[Groups] Bulk adding ${participants.length} members to group ${groupId}`);
+                    console.log(`[Groups] Bulk adding ${participants.length} members to group ${groupId} (delay: ${memberDelay / 1000}s)`);
 
                     for (let i = 0; i < participants.length; i++) {
                         const member = participants[i];
@@ -182,10 +183,9 @@ export async function PUT(req: NextRequest) {
                             }
                         }
 
-                        // Delay between adds (3-5 seconds to be safe)
+                        // Configurable delay between adds
                         if (i < participants.length - 1) {
-                            const delay = Math.floor(Math.random() * (5000 - 3000 + 1) + 3000);
-                            await new Promise(resolve => setTimeout(resolve, delay));
+                            await new Promise(resolve => setTimeout(resolve, memberDelay));
                         }
                     }
                     return NextResponse.json({
