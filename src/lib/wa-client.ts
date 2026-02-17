@@ -222,9 +222,29 @@ export class WAClient extends EventEmitter {
         this.emit('status', this.getStatus());
 
         try {
-            await clearRedisAuthState(this.sessionPrefix);
+            const useFileStore = process.env.USE_FILE_STORE === 'true' || !process.env.REDIS_URL || process.env.REDIS_URL.includes('localhost');
 
-            const { state, saveCreds } = await useRedisAuthState(this.sessionPrefix);
+            let state, saveCreds;
+
+            if (useFileStore) {
+                // Clear old session files first
+                const fs = await import('fs/promises');
+                try {
+                    await fs.rm(`sessions/${this.userId}-${this.profileId}`, { recursive: true, force: true });
+                } catch { /* ignore */ }
+
+                console.log(`[WA-${this.userId}-${this.profileId}] 📂 Pairing: Using File-Based Auth`);
+                const result = await useMultiFileAuthState(`sessions/${this.userId}-${this.profileId}`);
+                state = result.state;
+                saveCreds = result.saveCreds;
+            } else {
+                await clearRedisAuthState(this.sessionPrefix);
+                console.log(`[WA-${this.userId}-${this.profileId}] 🔴 Pairing: Using Redis Auth`);
+                const result = await useRedisAuthState(this.sessionPrefix);
+                state = result.state;
+                saveCreds = result.saveCreds;
+            }
+
             const { version } = await fetchLatestBaileysVersion();
 
             const sock = makeWASocket({
