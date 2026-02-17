@@ -1,28 +1,45 @@
-version: '3.8'
-
 services:
   app:
-    build: .
-    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: waqu-app
+    restart: unless-stopped
     ports:
       - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - REDIS_URL=redis://redis:6379
-      # Add other env vars here or use .env file
-      # - NEXT_PUBLIC_SUPABASE_URL=...
-      # - NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-      # - SUPABASE_SERVICE_ROLE_KEY=...
-    depends_on:
-      - redis
     env_file:
       - .env
-
-  redis:
-    image: redis:alpine
-    restart: always
+    environment:
+      - NODE_ENV=production
+      - USE_FILE_STORE=true
+      # Uncomment below if using Redis (optional)
+      # - REDIS_URL=redis://redis:6379
     volumes:
-      - redis_data:/data
+      # Persistent WhatsApp session storage (IMPORTANT!)
+      - wa_sessions:/app/sessions
+      # Persistent message store
+      - wa_store:/app/store
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3000/api/wa/status" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  # ================================
+  # Redis (OPTIONAL - uncomment if needed)
+  # ================================
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: waqu-redis
+  #   restart: unless-stopped
+  #   volumes:
+  #     - redis_data:/data
+  #   command: redis-server --appendonly yes
 
 volumes:
-  redis_data:
+  wa_sessions:
+    driver: local
+  wa_store:
+    driver: local
+  # redis_data:
+  #   driver: local

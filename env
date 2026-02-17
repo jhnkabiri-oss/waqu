@@ -1,6 +1,8 @@
 DATABASE_URL="postgresql://postgres:6IN16ZooVdeqzviO@db.yixrxvswsfiseslinpdv.supabase.co:5432/postgres?pgbouncer=true"
 DIRECT_URL="postgresql://postgres:6IN16ZooVdeqzviO@db.yixrxvswsfiseslinpdv.supabase.co:5432/postgres"
-REDIS_URL="redis://default:n2DpKdFPWZkibMYusYSYJaVc1t6aFgF3@redis-19075.c9.us-east-1-4.ec2.cloud.redislabs.com:19075"
+USE_FILE_STORE=true
+# Redis is OPTIONAL - uncomment if you have Redis
+# REDIS_URL="redis://default:password@host:port"
 GOOGLE_CLIENT_ID="233657540217-ee7bgbraui5plh9l7pb0mtm197chcbna.apps.googleusercontent.com"
 GOOGLE_CLIENT_SECRET="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"
 GOOGLE_REDIRECT_URI="https://whatsaapp.cyberroad.cloud/contacts/google-sync/callback"
