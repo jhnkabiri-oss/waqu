@@ -124,9 +124,21 @@ export async function PUT(req: NextRequest) {
             case 'removeParticipants':
                 await sock.groupParticipantsUpdate(groupId, data.participants, 'remove');
                 break;
-            case 'addParticipants':
-                await sock.groupParticipantsUpdate(groupId, data.participants, 'add');
-                break;
+            case 'addParticipants': {
+                try {
+                    const result = await sock.groupParticipantsUpdate(groupId, data.participants, 'add');
+                    return NextResponse.json({
+                        message: 'Participants add attempted',
+                        result: result,
+                    });
+                } catch (addErr) {
+                    console.error(`[API-Groups] addParticipants error:`, addErr);
+                    return NextResponse.json({
+                        error: 'Failed to add some participants: ' + (addErr as Error).message,
+                        details: 'Some numbers may have privacy settings that prevent being added to groups.',
+                    }, { status: 400 });
+                }
+            }
             case 'promoteParticipants':
                 await sock.groupParticipantsUpdate(groupId, data.participants, 'promote');
                 break;
