@@ -9,7 +9,7 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import { EventEmitter } from 'events';
-import { useRedisAuthState, clearRedisAuthState } from './baileys-redis-auth';
+import { useRedisAuthState, clearRedisAuthState, hasRedisSession } from './baileys-redis-auth';
 // import { useSupabaseAuthState, clearSupabaseAuthState } from './baileys-supabase-auth';
 // import { supabaseAdmin } from './supabase-admin';
 
@@ -40,6 +40,25 @@ export class WAClient extends EventEmitter {
         this.profileId = profileId;
         // Key: wa:sess:USER_ID:profile-ID:
         this.sessionPrefix = `${SESSION_PREFIX}${userId}:profile-${profileId}:`;
+    }
+
+    public static async sessionExists(userId: string, profileId: string): Promise<boolean> {
+        const useFileStore = process.env.USE_FILE_STORE === 'true' || !process.env.REDIS_URL || (process.env.REDIS_URL && process.env.REDIS_URL.includes('localhost'));
+
+        if (useFileStore) {
+            const fs = await import('fs/promises');
+            try {
+                // Check if the directory exists and has creds.json
+                const path = `sessions/${userId}-${profileId}/creds.json`;
+                await fs.access(path);
+                return true;
+            } catch {
+                return false;
+            }
+        } else {
+            const prefix = `${SESSION_PREFIX}${userId}:profile-${profileId}:`;
+            return await hasRedisSession(prefix);
+        }
     }
 
     getStatus() {

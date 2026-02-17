@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { waManager } from '@/lib/wa-client';
+import { waManager, WAClient } from '@/lib/wa-client';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
-import { hasRedisSession } from '@/lib/baileys-redis-auth';
 
 export async function GET(req: NextRequest) {
     const supabase = await createSupabaseServerClient();
@@ -34,25 +33,27 @@ export async function GET(req: NextRequest) {
     const profiles = waManager.getUserStatuses(user.id);
 
     // AUTO-WAKE: If Default Profile 1 is disconnected (meaning likely not in memory due to server restart),
-    // trigger a connection attempt so it restores from Redis.
+    // trigger a connection attempt so it restores from Redis or File Store.
     const p1 = profiles.find(p => p.profileId === '1');
     if (p1 && p1.status === 'disconnected') {
-        const client = waManager.getOrCreateClient(user.id, '1');
 
-        // CHECK REDIS FIRST: Only wake up if there is an actual session saved.
-        // This prevents infinite loops if the user meant to disconnect/cancel.
-        const sessionExists = await hasRedisSession(client.sessionPrefix);
+        // CHECK SESSION EXISTENCE FIRST (File or Redis)
+        // Only if a session actually exists do we attempt to create the client and connect.
+        const sessionExists = await WAClient.sessionExists(user.id, '1');
 
-        if (sessionExists && client.connectionStatus === 'disconnected') {
-            console.log(`[API-Status] Auto-waking up Profile 1 for user ${user.id} (Session found in Redis)`);
-            client.connect().catch(e => console.error(`[API-Status] Auto-wake failed:`, e));
-            // Show connecting immediately to user
-            p1.status = 'connecting';
-        } else if (!sessionExists) {
-            // No session in Redis, so it's truly disconnected. Do nothing.
+        if (sessionExists) {
+            const client = waManager.getOrCreateClient(user.id, '1');
+
+            if (client.connectionStatus === 'disconnected') {
+                console.log(`[API-Status] Auto-waking up Profile 1 for user ${user.id} (Session found)`);
+                client.connect().catch(e => console.error(`[API-Status] Auto-wake failed:`, e));
+                // Show connecting immediately to user
+                p1.status = 'connecting';
+            } else {
+                p1.status = client.connectionStatus;
+            }
         } else {
-            // It might be connecting or in other state
-            p1.status = client.connectionStatus;
+            // No session, so it's truly disconnected/brand new. Do nothing.
         }
     }
 
