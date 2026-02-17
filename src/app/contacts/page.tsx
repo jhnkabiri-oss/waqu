@@ -2,9 +2,189 @@
 
 import { useState, useRef } from 'react';
 
+// Country code lookup table (sorted by prefix length descending for accurate matching)
+const COUNTRY_CODES: Array<{ prefix: string; country: string; flag: string }> = [
+    // 3-digit codes
+    { prefix: '233', country: 'Ghana', flag: '🇬🇭' },
+    { prefix: '234', country: 'Nigeria', flag: '🇳🇬' },
+    { prefix: '254', country: 'Kenya', flag: '🇰🇪' },
+    { prefix: '255', country: 'Tanzania', flag: '🇹🇿' },
+    { prefix: '256', country: 'Uganda', flag: '🇺🇬' },
+    { prefix: '237', country: 'Cameroon', flag: '🇨🇲' },
+    { prefix: '250', country: 'Rwanda', flag: '🇷🇼' },
+    { prefix: '260', country: 'Zambia', flag: '🇿🇲' },
+    { prefix: '263', country: 'Zimbabwe', flag: '🇿🇼' },
+    { prefix: '251', country: 'Ethiopia', flag: '🇪🇹' },
+    { prefix: '252', country: 'Somalia', flag: '🇸🇴' },
+    { prefix: '212', country: 'Morocco', flag: '🇲🇦' },
+    { prefix: '213', country: 'Algeria', flag: '🇩🇿' },
+    { prefix: '216', country: 'Tunisia', flag: '🇹🇳' },
+    { prefix: '218', country: 'Libya', flag: '🇱🇾' },
+    { prefix: '220', country: 'Gambia', flag: '🇬🇲' },
+    { prefix: '221', country: 'Senegal', flag: '🇸🇳' },
+    { prefix: '225', country: 'Ivory Coast', flag: '🇨🇮' },
+    { prefix: '227', country: 'Niger', flag: '🇳🇪' },
+    { prefix: '228', country: 'Togo', flag: '🇹🇬' },
+    { prefix: '229', country: 'Benin', flag: '🇧🇯' },
+    { prefix: '230', country: 'Mauritius', flag: '🇲🇺' },
+    { prefix: '231', country: 'Liberia', flag: '🇱🇷' },
+    { prefix: '232', country: 'Sierra Leone', flag: '🇸🇱' },
+    { prefix: '235', country: 'Chad', flag: '🇹🇩' },
+    { prefix: '236', country: 'C. African Rep.', flag: '🇨🇫' },
+    { prefix: '238', country: 'Cape Verde', flag: '🇨🇻' },
+    { prefix: '239', country: 'São Tomé', flag: '🇸🇹' },
+    { prefix: '240', country: 'Eq. Guinea', flag: '🇬🇶' },
+    { prefix: '241', country: 'Gabon', flag: '🇬🇦' },
+    { prefix: '242', country: 'Congo', flag: '🇨🇬' },
+    { prefix: '243', country: 'DR Congo', flag: '🇨🇩' },
+    { prefix: '244', country: 'Angola', flag: '🇦🇴' },
+    { prefix: '245', country: 'Guinea-Bissau', flag: '🇬🇼' },
+    { prefix: '246', country: 'Diego Garcia', flag: '🇮🇴' },
+    { prefix: '247', country: 'Ascension', flag: '🇦🇨' },
+    { prefix: '248', country: 'Seychelles', flag: '🇸🇨' },
+    { prefix: '249', country: 'Sudan', flag: '🇸🇩' },
+    { prefix: '257', country: 'Burundi', flag: '🇧🇮' },
+    { prefix: '258', country: 'Mozambique', flag: '🇲🇿' },
+    { prefix: '261', country: 'Madagascar', flag: '🇲🇬' },
+    { prefix: '262', country: 'Reunion', flag: '🇷🇪' },
+    { prefix: '264', country: 'Namibia', flag: '🇳🇦' },
+    { prefix: '265', country: 'Malawi', flag: '🇲🇼' },
+    { prefix: '266', country: 'Lesotho', flag: '🇱🇸' },
+    { prefix: '267', country: 'Botswana', flag: '🇧🇼' },
+    { prefix: '268', country: 'Eswatini', flag: '🇸🇿' },
+    { prefix: '269', country: 'Comoros', flag: '🇰🇲' },
+    // Asia
+    { prefix: '880', country: 'Bangladesh', flag: '🇧🇩' },
+    { prefix: '886', country: 'Taiwan', flag: '🇹🇼' },
+    { prefix: '855', country: 'Cambodia', flag: '🇰🇭' },
+    { prefix: '856', country: 'Laos', flag: '🇱🇦' },
+    { prefix: '852', country: 'Hong Kong', flag: '🇭🇰' },
+    { prefix: '853', country: 'Macau', flag: '🇲🇴' },
+    { prefix: '960', country: 'Maldives', flag: '🇲🇻' },
+    { prefix: '961', country: 'Lebanon', flag: '🇱🇧' },
+    { prefix: '962', country: 'Jordan', flag: '🇯🇴' },
+    { prefix: '963', country: 'Syria', flag: '🇸🇾' },
+    { prefix: '964', country: 'Iraq', flag: '🇮🇶' },
+    { prefix: '965', country: 'Kuwait', flag: '🇰🇼' },
+    { prefix: '966', country: 'Saudi Arabia', flag: '🇸🇦' },
+    { prefix: '967', country: 'Yemen', flag: '🇾🇪' },
+    { prefix: '968', country: 'Oman', flag: '🇴🇲' },
+    { prefix: '971', country: 'UAE', flag: '🇦🇪' },
+    { prefix: '972', country: 'Israel', flag: '🇮🇱' },
+    { prefix: '973', country: 'Bahrain', flag: '🇧🇭' },
+    { prefix: '974', country: 'Qatar', flag: '🇶🇦' },
+    { prefix: '975', country: 'Bhutan', flag: '🇧🇹' },
+    { prefix: '976', country: 'Mongolia', flag: '🇲🇳' },
+    { prefix: '977', country: 'Nepal', flag: '🇳🇵' },
+    { prefix: '992', country: 'Tajikistan', flag: '🇹🇯' },
+    { prefix: '993', country: 'Turkmenistan', flag: '🇹🇲' },
+    { prefix: '994', country: 'Azerbaijan', flag: '🇦🇿' },
+    { prefix: '995', country: 'Georgia', flag: '🇬🇪' },
+    { prefix: '996', country: 'Kyrgyzstan', flag: '🇰🇬' },
+    { prefix: '998', country: 'Uzbekistan', flag: '🇺🇿' },
+    // Americas
+    { prefix: '502', country: 'Guatemala', flag: '🇬🇹' },
+    { prefix: '503', country: 'El Salvador', flag: '🇸🇻' },
+    { prefix: '504', country: 'Honduras', flag: '🇭🇳' },
+    { prefix: '505', country: 'Nicaragua', flag: '🇳🇮' },
+    { prefix: '506', country: 'Costa Rica', flag: '🇨🇷' },
+    { prefix: '507', country: 'Panama', flag: '🇵🇦' },
+    { prefix: '509', country: 'Haiti', flag: '🇭🇹' },
+    { prefix: '591', country: 'Bolivia', flag: '🇧🇴' },
+    { prefix: '592', country: 'Guyana', flag: '🇬🇾' },
+    { prefix: '593', country: 'Ecuador', flag: '🇪🇨' },
+    { prefix: '595', country: 'Paraguay', flag: '🇵🇾' },
+    { prefix: '597', country: 'Suriname', flag: '🇸🇷' },
+    { prefix: '598', country: 'Uruguay', flag: '🇺🇾' },
+    // Europe
+    { prefix: '351', country: 'Portugal', flag: '🇵🇹' },
+    { prefix: '352', country: 'Luxembourg', flag: '🇱🇺' },
+    { prefix: '353', country: 'Ireland', flag: '🇮🇪' },
+    { prefix: '354', country: 'Iceland', flag: '🇮🇸' },
+    { prefix: '355', country: 'Albania', flag: '🇦🇱' },
+    { prefix: '356', country: 'Malta', flag: '🇲🇹' },
+    { prefix: '357', country: 'Cyprus', flag: '🇨🇾' },
+    { prefix: '358', country: 'Finland', flag: '🇫🇮' },
+    { prefix: '359', country: 'Bulgaria', flag: '🇧🇬' },
+    { prefix: '370', country: 'Lithuania', flag: '🇱🇹' },
+    { prefix: '371', country: 'Latvia', flag: '🇱🇻' },
+    { prefix: '372', country: 'Estonia', flag: '🇪🇪' },
+    { prefix: '373', country: 'Moldova', flag: '🇲🇩' },
+    { prefix: '374', country: 'Armenia', flag: '🇦🇲' },
+    { prefix: '375', country: 'Belarus', flag: '🇧🇾' },
+    { prefix: '376', country: 'Andorra', flag: '🇦🇩' },
+    { prefix: '380', country: 'Ukraine', flag: '🇺🇦' },
+    { prefix: '381', country: 'Serbia', flag: '🇷🇸' },
+    { prefix: '385', country: 'Croatia', flag: '🇭🇷' },
+    { prefix: '386', country: 'Slovenia', flag: '🇸🇮' },
+    { prefix: '387', country: 'Bosnia', flag: '🇧🇦' },
+    { prefix: '389', country: 'N. Macedonia', flag: '🇲🇰' },
+    { prefix: '420', country: 'Czech Rep.', flag: '🇨🇿' },
+    { prefix: '421', country: 'Slovakia', flag: '🇸🇰' },
+    // 2-digit codes
+    { prefix: '62', country: 'Indonesia', flag: '🇮🇩' },
+    { prefix: '60', country: 'Malaysia', flag: '🇲🇾' },
+    { prefix: '63', country: 'Philippines', flag: '🇵🇭' },
+    { prefix: '65', country: 'Singapore', flag: '🇸🇬' },
+    { prefix: '66', country: 'Thailand', flag: '🇹🇭' },
+    { prefix: '84', country: 'Vietnam', flag: '🇻🇳' },
+    { prefix: '86', country: 'China', flag: '🇨🇳' },
+    { prefix: '81', country: 'Japan', flag: '🇯🇵' },
+    { prefix: '82', country: 'South Korea', flag: '🇰🇷' },
+    { prefix: '91', country: 'India', flag: '🇮🇳' },
+    { prefix: '92', country: 'Pakistan', flag: '🇵🇰' },
+    { prefix: '93', country: 'Afghanistan', flag: '🇦🇫' },
+    { prefix: '94', country: 'Sri Lanka', flag: '🇱🇰' },
+    { prefix: '95', country: 'Myanmar', flag: '🇲🇲' },
+    { prefix: '98', country: 'Iran', flag: '🇮🇷' },
+    { prefix: '90', country: 'Turkey', flag: '🇹🇷' },
+    { prefix: '20', country: 'Egypt', flag: '🇪🇬' },
+    { prefix: '27', country: 'South Africa', flag: '🇿🇦' },
+    { prefix: '30', country: 'Greece', flag: '🇬🇷' },
+    { prefix: '31', country: 'Netherlands', flag: '🇳🇱' },
+    { prefix: '32', country: 'Belgium', flag: '🇧🇪' },
+    { prefix: '33', country: 'France', flag: '🇫🇷' },
+    { prefix: '34', country: 'Spain', flag: '🇪🇸' },
+    { prefix: '36', country: 'Hungary', flag: '🇭🇺' },
+    { prefix: '39', country: 'Italy', flag: '🇮🇹' },
+    { prefix: '40', country: 'Romania', flag: '🇷🇴' },
+    { prefix: '41', country: 'Switzerland', flag: '🇨🇭' },
+    { prefix: '43', country: 'Austria', flag: '🇦🇹' },
+    { prefix: '44', country: 'UK', flag: '🇬🇧' },
+    { prefix: '45', country: 'Denmark', flag: '🇩🇰' },
+    { prefix: '46', country: 'Sweden', flag: '🇸🇪' },
+    { prefix: '47', country: 'Norway', flag: '🇳🇴' },
+    { prefix: '48', country: 'Poland', flag: '🇵🇱' },
+    { prefix: '49', country: 'Germany', flag: '🇩🇪' },
+    { prefix: '51', country: 'Peru', flag: '🇵🇪' },
+    { prefix: '52', country: 'Mexico', flag: '🇲🇽' },
+    { prefix: '53', country: 'Cuba', flag: '🇨🇺' },
+    { prefix: '54', country: 'Argentina', flag: '🇦🇷' },
+    { prefix: '55', country: 'Brazil', flag: '🇧🇷' },
+    { prefix: '56', country: 'Chile', flag: '🇨🇱' },
+    { prefix: '57', country: 'Colombia', flag: '🇨🇴' },
+    { prefix: '58', country: 'Venezuela', flag: '🇻🇪' },
+    // 1-digit codes
+    { prefix: '1', country: 'USA/Canada', flag: '🇺🇸' },
+    { prefix: '7', country: 'Russia', flag: '🇷🇺' },
+];
+
+function detectCountry(phone: string): { country: string; flag: string } | null {
+    const clean = phone.replace(/^\+/, '');
+    // Try 3-digit, then 2-digit, then 1-digit prefixes
+    for (const cc of COUNTRY_CODES) {
+        if (clean.startsWith(cc.prefix)) {
+            return { country: cc.country, flag: cc.flag };
+        }
+    }
+    return null;
+}
+
 interface Contact {
     name: string;
     phone: string;
+    country?: string;
+    flag?: string;
 }
 
 export default function ContactsPage() {
@@ -91,7 +271,8 @@ export default function ContactsPage() {
                 name = `Contact ${phone.slice(-4)}`;
             }
 
-            parsed.push({ name, phone });
+            const detected = detectCountry(phone);
+            parsed.push({ name, phone, country: detected?.country, flag: detected?.flag });
         }
 
         return parsed;
@@ -469,6 +650,46 @@ export default function ContactsPage() {
                     <div className="card-header">
                         <div className="card-title">Preview ({contacts.length} contacts)</div>
                     </div>
+                    {/* Country Stats */}
+                    {(() => {
+                        const countryStats: Record<string, { flag: string; count: number }> = {};
+                        let unknownCount = 0;
+                        contacts.forEach(c => {
+                            if (c.country && c.flag) {
+                                if (!countryStats[c.country]) countryStats[c.country] = { flag: c.flag, count: 0 };
+                                countryStats[c.country].count++;
+                            } else {
+                                unknownCount++;
+                            }
+                        });
+                        const entries = Object.entries(countryStats).sort((a, b) => b[1].count - a[1].count);
+                        if (entries.length === 0) return null;
+                        return (
+                            <div style={{
+                                display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '12px 16px',
+                                background: 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '12px'
+                            }}>
+                                {entries.map(([country, { flag, count }]) => (
+                                    <span key={country} style={{
+                                        fontSize: '12px', padding: '4px 10px',
+                                        background: 'var(--bg-secondary)', borderRadius: '20px',
+                                        color: 'var(--text-secondary)'
+                                    }}>
+                                        {flag} {country}: <strong style={{ color: 'var(--accent)' }}>{count}</strong>
+                                    </span>
+                                ))}
+                                {unknownCount > 0 && (
+                                    <span style={{
+                                        fontSize: '12px', padding: '4px 10px',
+                                        background: 'var(--bg-secondary)', borderRadius: '20px',
+                                        color: 'var(--text-muted)'
+                                    }}>
+                                        ❓ Unknown: <strong>{unknownCount}</strong>
+                                    </span>
+                                )}
+                            </div>
+                        );
+                    })()}
                     <div className="table-container" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                         <table>
                             <thead>
@@ -476,6 +697,7 @@ export default function ContactsPage() {
                                     <th>#</th>
                                     <th>Name</th>
                                     <th>Phone</th>
+                                    <th>Country</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -487,6 +709,9 @@ export default function ContactsPage() {
                                             <code style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: '4px' }}>
                                                 {c.phone}
                                             </code>
+                                        </td>
+                                        <td style={{ fontSize: '13px' }}>
+                                            {c.flag ? `${c.flag} ${c.country}` : <span style={{ color: 'var(--text-muted)' }}>❓</span>}
                                         </td>
                                     </tr>
                                 ))}
