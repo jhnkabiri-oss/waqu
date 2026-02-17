@@ -360,7 +360,17 @@ export class WAClient extends EventEmitter {
                     // Remove from Redis
                     clearRedisAuthState(this.sessionPrefix);
                 } else if (this.reconnectAttempts < this.maxReconnectAttempts || isConflict) {
-                    // If conflict, retry indefinitely or with backoff, but don't wipe.
+                    // CRITICAL: Don't auto-reconnect if we never successfully connected.
+                    // If phoneNumber is null, it means no QR was scanned / no pairing happened.
+                    // Reconnecting would just create another empty session and loop forever.
+                    if (!this.phoneNumber && !isConflict) {
+                        console.log(`[WA-${this.userId}-${this.profileId}] 🚫 Never connected before (no phoneNumber). NOT reconnecting.`);
+                        this.connectionStatus = 'disconnected';
+                        this.reconnectAttempts = 0;
+                        this.emit('status', this.getStatus());
+                        return;
+                    }
+
                     // Exponential backoff: 2s, 4s, 8s, 16s, 32s
                     const delay = isConflict ? 5000 : Math.pow(2, this.reconnectAttempts) * 1000;
                     console.log(`[WA-${this.userId}-${this.profileId}] 🔄 Reconnecting in ${delay}ms... (Reason: ${isConflict ? 'Conflict' : 'Error'}, Attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
