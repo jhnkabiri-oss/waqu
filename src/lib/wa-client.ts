@@ -300,7 +300,11 @@ export class WAClient extends EventEmitter {
 
                 // CRITICAL FIX: Only delete session if explicitly logged out (401)
                 // Do NOT delete on 500, 408, 515 or undefined errors.
-                if (statusCode === DisconnectReason.loggedOut) {
+                // ALSO: Check if it's a "Stream Errored (conflict)" (which is also 401 but NOT a logout)
+                const isConflict = (lastDisconnect?.error as any)?.output?.payload?.message === 'Stream Errored (conflict)' ||
+                    (lastDisconnect?.error as any)?.message?.includes('conflict');
+
+                if (statusCode === DisconnectReason.loggedOut && !isConflict) {
                     console.warn(`[WA-${this.userId}-${this.profileId}] ⚠️ Session expired/logged out. Cleaning up.`);
                     this.connectionStatus = 'disconnected';
                     this.phoneNumber = null;
@@ -311,12 +315,13 @@ export class WAClient extends EventEmitter {
 
                     // Remove from Redis
                     clearRedisAuthState(this.sessionPrefix);
-                } else if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                } else if (this.reconnectAttempts < this.maxReconnectAttempts || isConflict) {
+                    // If conflict, retry indefinitely or with backoff, but don't wipe.
                     // Exponential backoff: 2s, 4s, 8s, 16s, 32s
-                    const delay = Math.pow(2, this.reconnectAttempts) * 1000;
-                    console.log(`[WA-${this.userId}-${this.profileId}] 🔄 Reconnecting in ${delay}ms... (Attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
+                    const delay = isConflict ? 5000 : Math.pow(2, this.reconnectAttempts) * 1000;
+                    console.log(`[WA-${this.userId}-${this.profileId}] 🔄 Reconnecting in ${delay}ms... (Reason: ${isConflict ? 'Conflict' : 'Error'}, Attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
 
-                    this.reconnectAttempts++;
+                    if (!isConflict) this.reconnectAttempts++;
                     this.connectionStatus = 'connecting';
                     this.emit('status', this.getStatus());
 
