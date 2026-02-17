@@ -4,6 +4,7 @@ import makeWASocket, {
     WASocket,
     ConnectionState,
     Browsers,
+    useMultiFileAuthState,
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
@@ -77,7 +78,24 @@ export class WAClient extends EventEmitter {
         this.emit('status', this.getStatus());
 
         try {
-            const { state, saveCreds } = await useRedisAuthState(this.sessionPrefix);
+            let state, saveCreds;
+
+            // SIMPLIFIED MODE: Use file-based auth if REDIS_URL is strictly localhost or empty
+            // This matches the user's request for "Versi Awal" simplicity for local/VPS
+            const useFileStore = process.env.USE_FILE_STORE === 'true' || !process.env.REDIS_URL || process.env.REDIS_URL.includes('localhost');
+
+            if (useFileStore) {
+                console.log(`[WA-${this.userId}-${this.profileId}] 📂 Using File-Based Auth (local/vps mode)`);
+                const { state: s, saveCreds: c } = await useMultiFileAuthState(`sessions/${this.userId}-${this.profileId}`);
+                state = s;
+                saveCreds = c;
+            } else {
+                console.log(`[WA-${this.userId}-${this.profileId}] 🔴 Using Redis Auth`);
+                const redisAuth = await useRedisAuthState(this.sessionPrefix);
+                state = redisAuth.state;
+                saveCreds = redisAuth.saveCreds;
+            }
+
             const { version } = await fetchLatestBaileysVersion();
 
             this.socket = makeWASocket({
@@ -366,7 +384,18 @@ export class WAClient extends EventEmitter {
             } catch { /* ignore */ }
             this.socket = null;
         }
-        await clearRedisAuthState(this.sessionPrefix);
+
+        const useFileStore = process.env.USE_FILE_STORE === 'true' || !process.env.REDIS_URL || (process.env.REDIS_URL && process.env.REDIS_URL.includes('localhost'));
+        if (useFileStore) {
+            const fs = await import('fs/promises');
+            try {
+                await fs.rm(`sessions/${this.userId}-${this.profileId}`, { recursive: true, force: true });
+            } catch (e) {
+                console.error(`[WA-${this.userId}-${this.profileId}] Failed to delete session file:`, e);
+            }
+        } else {
+            await clearRedisAuthState(this.sessionPrefix);
+        }
 
         this.connectionStatus = 'disconnected';
         this.currentQR = null;
@@ -386,6 +415,21 @@ export class WAClient extends EventEmitter {
                 try { this.socket.end(undefined); } catch { /* ignore */ }
             }
             this.socket = null;
+        }
+
+        const useFileStore = process.env.USE_FILE_STORE === 'true' || !process.env.REDIS_URL || (process.env.REDIS_URL && process.env.REDIS_URL.includes('localhost'));
+        if (!useFileStore) {
+            // Only clear Redis if we are using it. File store handles itself/doesn't need explict logout cleanup usually
+            await clearRedisAuthState(this.sessionPrefix);
+        } else {
+            // For file store, we might want to keep the folder unless explicitly logged out.
+            // If this is a true logout, we should delete the folder.
+            const fs = await import('fs/promises');
+            try {
+                await fs.rm(`sessions/${this.userId}-${this.profileId}`, { recursive: true, force: true });
+            } catch (e) {
+                console.error(`[WA-${this.userId}-${this.profileId}] Failed to delete session file:`, e);
+            }
         }
 
         this.connectionStatus = 'disconnected';
