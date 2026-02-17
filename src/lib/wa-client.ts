@@ -25,6 +25,7 @@ export class WAClient extends EventEmitter {
     private reconnectAttempts = 0;
     private maxReconnectAttempts = 5;
     private isPairingMode = false;
+    private isStopped = false;
     public readonly profileId: string;
     public readonly userId: string;
     public readonly sessionPrefix: string;
@@ -61,6 +62,7 @@ export class WAClient extends EventEmitter {
     }
 
     async connect(): Promise<void> {
+        this.isStopped = false;
         if (this.connectionStatus === 'connected' && this.socket) {
             return;
         }
@@ -296,6 +298,11 @@ export class WAClient extends EventEmitter {
 
                 console.error(`[WA-${this.userId}-${this.profileId}] ❌ Disconnected! Status: ${statusCode}`, error);
 
+                if (this.isStopped) {
+                    console.log(`[WA-${this.userId}-${this.profileId}] 🛑 Client stopped by user. Not reconnecting.`);
+                    return;
+                }
+
                 if (this.isPairingMode) return;
 
                 // CRITICAL FIX: Only delete session if explicitly logged out (401)
@@ -350,6 +357,7 @@ export class WAClient extends EventEmitter {
     }
 
     async cancelConnection(): Promise<void> {
+        this.isStopped = true;
         if (this.socket) {
             try {
                 this.socket.ev.removeAllListeners('connection.update');
@@ -370,6 +378,7 @@ export class WAClient extends EventEmitter {
     }
 
     async disconnect(): Promise<void> {
+        this.isStopped = true;
         if (this.socket) {
             try {
                 await this.socket.logout();
@@ -386,6 +395,7 @@ export class WAClient extends EventEmitter {
         this.reconnectAttempts = 0;
         this.isPairingMode = false;
         this.emit('status', this.getStatus());
+        this.emit('logged-out'); // Ensure frontend knows
     }
 }
 
