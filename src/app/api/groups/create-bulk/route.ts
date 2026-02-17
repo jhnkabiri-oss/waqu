@@ -37,14 +37,26 @@ export async function POST(req: NextRequest) {
 
         const client = waManager.getOrCreateClient(user.id, profileId);
         const isConnected = await client.waitForConnection(30000);
-        const socket = client.getSocket();
 
-        if (!socket || !isConnected) {
+        if (!isConnected) {
             return NextResponse.json(
                 { error: `WhatsApp Profile ${profileId} not connected or failed to reconnect.` },
                 { status: 400 }
             );
         }
+
+        // Helper: get a live socket, waiting for reconnection if needed
+        const getLiveSocket = async () => {
+            let sock = client.getSocket();
+            if (!sock || client.getStatus().status !== 'connected') {
+                console.log(`[Groups] Socket stale, waiting for reconnection...`);
+                const reconnected = await client.waitForConnection(30000);
+                if (!reconnected) throw new Error('WhatsApp disconnected and failed to reconnect');
+                sock = client.getSocket();
+            }
+            if (!sock) throw new Error('No active WhatsApp socket');
+            return sock;
+        };
 
         const results: Array<{ name: string; status: string; id?: string; error?: string; added?: number; failed?: number }> = [];
 
@@ -70,14 +82,15 @@ export async function POST(req: NextRequest) {
                 let result;
                 while (retries > 0) {
                     try {
+                        const socket = await getLiveSocket();
                         result = await socket.groupCreate(group.name, initialMembers);
                         break;
                     } catch (err) {
                         const errMsg = (err as Error).message || '';
-                        if ((errMsg.includes('rate') || errMsg.includes('429')) && retries > 1) {
+                        if ((errMsg.includes('rate') || errMsg.includes('429') || errMsg.includes('Connection Closed') || errMsg.includes('close')) && retries > 1) {
                             retries--;
-                            const waitTime = 30;
-                            console.log(`[Groups] Rate limited on create, waiting ${waitTime}s... (${retries} retries left)`);
+                            const waitTime = errMsg.includes('Connection Closed') || errMsg.includes('close') ? 10 : 30;
+                            console.log(`[Groups] ${errMsg.includes('Connection') ? 'Connection lost' : 'Rate limited'} on create, waiting ${waitTime}s... (${retries} retries left)`);
                             await sleep(waitTime * 1000);
                         } else {
                             throw err;
@@ -93,6 +106,7 @@ export async function POST(req: NextRequest) {
                 if (group.description && result.id) {
                     try {
                         await sleep(2000);
+                        const socket = await getLiveSocket();
                         await socket.groupUpdateDescription(result.id, group.description);
                         console.log(`[Groups]   Description set.`);
                     } catch (descErr) {
@@ -115,6 +129,7 @@ export async function POST(req: NextRequest) {
                         const memberNum = member.replace('@s.whatsapp.net', '');
 
                         try {
+                            const socket = await getLiveSocket();
                             await socket.groupParticipantsUpdate(result.id, [member], 'add');
                             addedCount++;
                             console.log(`[Groups]   ✅ Added ${m + 1}/${remainingMembers.length}: ${memberNum}`);
@@ -127,6 +142,7 @@ export async function POST(req: NextRequest) {
                                 await sleep(30000);
 
                                 try {
+                                    const socket = await getLiveSocket();
                                     await socket.groupParticipantsUpdate(result.id, [member], 'add');
                                     addedCount++;
                                     console.log(`[Groups]   ✅ Retry success: ${memberNum}`);
